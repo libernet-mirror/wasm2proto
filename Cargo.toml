@@ -1,0 +1,19 @@
+[package]
+name = "wasm2proto"
+version = "0.1.0"
+edition = "2024"
+default-run = "wasm2proto"
+
+[dependencies]
+anyhow = "1.0.100"
+prost = "0.14.1"
+prost-types = "0.14.1"
+wasmparser = "0.244"
+wasm-encoder = "0.244"
+
+[[bin]]
+name = "wasm2proto"
+path = "src/wasm2proto.rs"
+
+[build-dependencies]
+prost-build = "0.14.1"
