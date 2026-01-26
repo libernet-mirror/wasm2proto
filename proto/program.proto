@@ -53,10 +53,6 @@
 //   aggregated section, which requires strict ordering guarantees during
 //   encoding and decoding.
 //
-// - Expression.bytecode is used for both constant expressions and function
-//   operator streams; the exact binary contract (presence of the final `end`
-//   opcode) must be carefully preserved to avoid malformed output.
-//
 // - ElementKind and DataKind allow structurally invalid combinations
 //   (e.g. missing offsets for active segments) and would benefit from
 //   stricter modeling.
@@ -114,7 +110,7 @@ message DataKind {
 }
 
 message Expression {
-  required bytes bytecode = 1;
+  repeated Operator operators = 1;
 }
 
 message RefType {
