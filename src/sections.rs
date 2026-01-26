@@ -403,7 +403,7 @@ impl GlobalSection {
                     mutable: global.ty.mutable,
                     shared: global.ty.shared,
                 },
-                &ConstExpr::raw(global.init_expr.bytecode.clone()),
+                &ConstExpr::try_from(global.init_expr.clone())?,
             );
         }
         module.section(&globals);
@@ -490,15 +490,14 @@ impl ElementSection {
                 ElementKindType::ElPassive => ElementMode::Passive,
                 ElementKindType::ElActive => ElementMode::Active {
                     table: element.kind.table_index,
-                    offset: &ConstExpr::raw(
+                    offset: &ConstExpr::try_from(
                         element
                             .kind
                             .expression
                             .as_ref()
                             .ok_or(anyhow!("Expression not found"))?
-                            .bytecode
                             .clone(),
-                    ),
+                    )?,
                 },
                 ElementKindType::ElDeclared => ElementMode::Declared,
             };
@@ -506,15 +505,16 @@ impl ElementSection {
                 element::Items::Functions(functions) => {
                     Elements::Functions(functions.functions.clone().into())
                 }
-                element::Items::Expressions(expressions) => Elements::Expressions(
-                    RefType::try_from(expressions.ref_type)?,
-                    expressions
-                        .expressions
-                        .clone()
-                        .into_iter()
-                        .map(|e| ConstExpr::raw(e.bytecode.clone()))
-                        .collect(),
-                ),
+                element::Items::Expressions(expressions) => {
+                    let mut instructions: Vec<ConstExpr> = Vec::new();
+                    for expression in &expressions.expressions {
+                        instructions.push(ConstExpr::try_from(expression.clone())?);
+                    }
+                    Elements::Expressions(
+                        RefType::try_from(expressions.ref_type)?,
+                        instructions.into(),
+                    )
+                }
             };
             elements.segment(ElementSegment {
                 mode: element_mode,
@@ -593,14 +593,13 @@ impl DataSection {
                         .kind
                         .memory_index
                         .ok_or(anyhow!("Memory index not found"))?,
-                    offset: &ConstExpr::raw(
+                    offset: &ConstExpr::try_from(
                         data.kind
                             .expression
                             .as_ref()
                             .ok_or(anyhow!("Expression not found"))?
-                            .bytecode
                             .clone(),
-                    ),
+                    )?,
                 },
             };
             section.segment(DataSegment {

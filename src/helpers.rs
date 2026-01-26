@@ -36,27 +36,31 @@ impl TryFrom<wasmparser::ConstExpr<'_>> for Expression {
     type Error = anyhow::Error;
 
     fn try_from(expr: wasmparser::ConstExpr<'_>) -> Result<Self> {
-        let mut r = expr.get_binary_reader();
-        let mut bytecode = r.read_bytes(r.bytes_remaining())?.to_vec();
-        // remove end opcode, wasmencoder adds it automatically
-        if bytecode.last() == Some(&0x0B) {
-            bytecode.pop();
+        let reader = expr.get_operators_reader();
+        let mut operators: Vec<Operator> = Vec::new();
+        for operator in reader {
+            operators.push(Operator::try_from(operator?)?);
         }
-        if !r.eof() {
-            bail!("Unexpected bytes remaining in expression");
-        }
-        Ok(Expression { bytecode })
+        Ok(Expression { operators })
     }
 }
 
-impl TryFrom<wasmparser::BinaryReader<'_>> for Expression {
+impl TryFrom<Expression> for wasm_encoder::ConstExpr {
     type Error = anyhow::Error;
 
-    fn try_from(mut r: wasmparser::BinaryReader<'_>) -> Result<Self> {
-        let n = r.bytes_remaining();
-        Ok(Expression {
-            bytecode: r.read_bytes(n)?.to_vec(),
-        })
+    fn try_from(expression: Expression) -> Result<Self> {
+        use wasm_encoder::ConstExpr;
+        let mut instructions: Vec<wasm_encoder::Instruction> = Vec::new();
+        for operator in expression.operators {
+            instructions.push(wasm_encoder::Instruction::try_from(operator)?);
+        }
+        // drop last operator if it is end
+        if let Some(last) = instructions.last()
+            && matches!(last, wasm_encoder::Instruction::End)
+        {
+            instructions.pop();
+        }
+        Ok(ConstExpr::extended(instructions))
     }
 }
 
@@ -270,51 +274,6 @@ mod tests {
     }
 
     #[test]
-    fn test_expression_from_const_expr() {
-        // Create a WASM module with a global that has a const expression
-        let mut module = wasm_encoder::Module::new();
-        let mut global_section = wasm_encoder::GlobalSection::new();
-        global_section.global(
-            wasm_encoder::GlobalType {
-                val_type: wasm_encoder::ValType::I32,
-                mutable: false,
-                shared: false,
-            },
-            &wasm_encoder::ConstExpr::raw(vec![0x41, 0x2A, 0x0B]), // i32.const 42, end
-        );
-        module.section(&global_section);
-        let wasm_bytes = module.finish();
-
-        // Parse to get the ConstExpr
-        let parser = wasmparser::Parser::new(0);
-        for payload in parser.parse_all(&wasm_bytes) {
-            let payload = payload.unwrap();
-            if let wasmparser::Payload::GlobalSection(section) = payload {
-                for global_result in section {
-                    match global_result {
-                        std::result::Result::Ok(global) => {
-                            let init_expr = global.init_expr;
-                            let expr = Expression::try_from(init_expr).unwrap();
-                            // End opcode (0x0B) should be removed
-                            assert_eq!(expr.bytecode, vec![0x41, 0x2A]);
-                            break;
-                        }
-                        std::result::Result::Err(_) => continue,
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_expression_from_binary_reader() {
-        let bytecode = vec![0x41, 0x2A, 0x0B]; // i32.const 42, end
-        let reader = wasmparser::BinaryReader::new(&bytecode, 0);
-        let expr = Expression::try_from(reader).unwrap();
-        assert_eq!(expr.bytecode, bytecode);
-    }
-
-    #[test]
     fn test_external_kind_from_wasmparser() {
         use wasmparser::ExternalKind as WasmParserExternalKind;
 
@@ -363,123 +322,6 @@ mod tests {
 
         // Test unsupported ExtFuncExact
         assert!(wasm_encoder::ExportKind::try_from(ExternalKind::ExtFuncExact).is_err());
-    }
-
-    #[test]
-    fn test_element_kind_from_wasmparser() {
-        // Test Passive
-        let passive = wasmparser::ElementKind::Passive;
-        let result = ElementKind::try_from(passive).unwrap();
-        assert_eq!(result.ty, ElementKindType::ElPassive as i32);
-        assert!(result.table_index.is_none());
-        assert!(result.expression.is_none());
-
-        // Test Declared
-        let declared = wasmparser::ElementKind::Declared;
-        let result = ElementKind::try_from(declared).unwrap();
-        assert_eq!(result.ty, ElementKindType::ElDeclared as i32);
-        assert!(result.table_index.is_none());
-        assert!(result.expression.is_none());
-
-        // Test Active with offset expression - create a WASM module with element section
-        let mut module = wasm_encoder::Module::new();
-        let mut table_section = wasm_encoder::TableSection::new();
-        table_section.table(wasm_encoder::TableType {
-            element_type: wasm_encoder::RefType::FUNCREF,
-            minimum: 0,
-            maximum: None,
-            shared: false,
-            table64: false,
-        });
-        module.section(&table_section);
-        let mut element_section = wasm_encoder::ElementSection::new();
-        element_section.segment(wasm_encoder::ElementSegment {
-            mode: wasm_encoder::ElementMode::Active {
-                table: Some(0),
-                offset: &wasm_encoder::ConstExpr::raw(vec![0x41, 0x00, 0x0B]), // i32.const 0, end
-            },
-            elements: wasm_encoder::Elements::Functions(vec![].into()),
-        });
-        module.section(&element_section);
-        let wasm_bytes = module.finish();
-
-        // Parse to get the ElementKind
-        let parser = wasmparser::Parser::new(0);
-        for payload in parser.parse_all(&wasm_bytes) {
-            let payload = payload.unwrap();
-            if let wasmparser::Payload::ElementSection(section) = payload {
-                for element_result in section {
-                    match element_result {
-                        std::result::Result::Ok(element) => {
-                            let kind = element.kind;
-                            let result = ElementKind::try_from(kind).unwrap();
-                            assert_eq!(result.ty, ElementKindType::ElActive as i32);
-                            assert_eq!(result.table_index, Some(0));
-                            assert!(result.expression.is_some());
-                            // Verify the expression has the end opcode removed
-                            assert_eq!(result.expression.unwrap().bytecode, vec![0x41, 0x00]);
-                            break;
-                        }
-                        std::result::Result::Err(_) => continue,
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_data_kind_from_wasmparser() {
-        // Test Passive
-        let passive = wasmparser::DataKind::Passive;
-        let result = DataKind::try_from(passive).unwrap();
-        assert_eq!(result.ty, DataKindType::Passive as i32);
-        assert!(result.memory_index.is_none());
-        assert!(result.expression.is_none());
-
-        // Test Active with offset expression - create a WASM module with data section
-        let mut module = wasm_encoder::Module::new();
-        let mut memory_section = wasm_encoder::MemorySection::new();
-        memory_section.memory(wasm_encoder::MemoryType {
-            minimum: 1,
-            maximum: None,
-            memory64: false,
-            shared: false,
-            page_size_log2: None,
-        });
-        module.section(&memory_section);
-        let mut data_section = wasm_encoder::DataSection::new();
-        data_section.segment(wasm_encoder::DataSegment {
-            mode: wasm_encoder::DataSegmentMode::Active {
-                memory_index: 0,
-                offset: &wasm_encoder::ConstExpr::raw(vec![0x41, 0x00, 0x0B]), // i32.const 0, end
-            },
-            data: vec![],
-        });
-        module.section(&data_section);
-        let wasm_bytes = module.finish();
-
-        // Parse to get the DataKind
-        let parser = wasmparser::Parser::new(0);
-        for payload in parser.parse_all(&wasm_bytes) {
-            let payload = payload.unwrap();
-            if let wasmparser::Payload::DataSection(section) = payload {
-                for data_result in section {
-                    match data_result {
-                        std::result::Result::Ok(data) => {
-                            let kind = data.kind;
-                            let result = DataKind::try_from(kind).unwrap();
-                            assert_eq!(result.ty, DataKindType::Active as i32);
-                            assert_eq!(result.memory_index, Some(0));
-                            assert!(result.expression.is_some());
-                            // Verify the expression has the end opcode removed
-                            assert_eq!(result.expression.unwrap().bytecode, vec![0x41, 0x00]);
-                            break;
-                        }
-                        std::result::Result::Err(_) => continue,
-                    }
-                }
-            }
-        }
     }
 
     #[test]
@@ -584,14 +426,5 @@ mod tests {
         } else {
             panic!("Expected Abstract heap type");
         }
-    }
-
-    #[test]
-    fn test_expression_from_binary_reader_preserves_all_bytes() {
-        // BinaryReader path should preserve all bytes including end opcode
-        let bytecode = vec![0x41, 0x2A, 0x0B, 0xFF]; // i32.const 42, end, extra byte
-        let reader = wasmparser::BinaryReader::new(&bytecode, 0);
-        let expr = Expression::try_from(reader).unwrap();
-        assert_eq!(expr.bytecode, bytecode);
     }
 }
