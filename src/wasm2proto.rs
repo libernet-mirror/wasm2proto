@@ -7,6 +7,7 @@ pub mod program {
 }
 
 mod helpers;
+mod operators;
 mod program_module;
 mod sections;
 

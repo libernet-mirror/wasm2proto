@@ -16,4 +16,5 @@ name = "wasm2proto"
 path = "src/wasm2proto.rs"
 
 [build-dependencies]
+wasmparser = "0.244"
 prost-build = "0.14.1"
