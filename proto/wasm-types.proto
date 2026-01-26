@@ -1,0 +1,13 @@
+package program;
+
+enum ValueType {
+  I32 = 1;
+  I64 = 2;
+  F32 = 3;
+  F64 = 4;
+  V128 = 5;
+}
+
+enum AbstractRefType {
+  RefFunc = 1;
+}

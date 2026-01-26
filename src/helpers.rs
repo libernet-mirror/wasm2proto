@@ -348,16 +348,16 @@ mod tests {
     fn test_external_kind_to_wasm_encoder() {
         let result = wasm_encoder::ExportKind::try_from(ExternalKind::ExtFunc).unwrap();
         assert!(matches!(result, wasm_encoder::ExportKind::Func));
-        
+
         let result = wasm_encoder::ExportKind::try_from(ExternalKind::ExtTable).unwrap();
         assert!(matches!(result, wasm_encoder::ExportKind::Table));
-        
+
         let result = wasm_encoder::ExportKind::try_from(ExternalKind::ExtMemory).unwrap();
         assert!(matches!(result, wasm_encoder::ExportKind::Memory));
-        
+
         let result = wasm_encoder::ExportKind::try_from(ExternalKind::ExtGlobal).unwrap();
         assert!(matches!(result, wasm_encoder::ExportKind::Global));
-        
+
         let result = wasm_encoder::ExportKind::try_from(ExternalKind::ExtTag).unwrap();
         assert!(matches!(result, wasm_encoder::ExportKind::Tag));
 
@@ -417,10 +417,7 @@ mod tests {
                             assert_eq!(result.table_index, Some(0));
                             assert!(result.expression.is_some());
                             // Verify the expression has the end opcode removed
-                            assert_eq!(
-                                result.expression.unwrap().bytecode,
-                                vec![0x41, 0x00]
-                            );
+                            assert_eq!(result.expression.unwrap().bytecode, vec![0x41, 0x00]);
                             break;
                         }
                         std::result::Result::Err(_) => continue,
@@ -475,10 +472,7 @@ mod tests {
                             assert_eq!(result.memory_index, Some(0));
                             assert!(result.expression.is_some());
                             // Verify the expression has the end opcode removed
-                            assert_eq!(
-                                result.expression.unwrap().bytecode,
-                                vec![0x41, 0x00]
-                            );
+                            assert_eq!(result.expression.unwrap().bytecode, vec![0x41, 0x00]);
                             break;
                         }
                         std::result::Result::Err(_) => continue,
@@ -591,7 +585,6 @@ mod tests {
             panic!("Expected Abstract heap type");
         }
     }
-
 
     #[test]
     fn test_expression_from_binary_reader_preserves_all_bytes() {

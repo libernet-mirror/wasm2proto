@@ -37,9 +37,10 @@ pub fn render_wasm(program: ProgramModule) -> Result<Vec<u8>> {
     for section in &program.sections {
         section.render_wasm(&mut module, &mut code_section)?;
         if let Some(last_code_section_entry) = last_code_section_entry
-            && last_code_section_entry == section {
-                module.section(&code_section);
-            }
+            && last_code_section_entry == section
+        {
+            module.section(&code_section);
+        }
     }
     Ok(module.finish())
 }

@@ -74,12 +74,11 @@ syntax = "proto2";
 
 package program;
 
+import "wasm-types.proto";
+import "wasm-operators.proto";
+
 enum Encoding {
   ENCODING_MODULE = 1;
-}
-
-enum AbstractRefType {
-  RefFunc = 1;
 }
 
 enum ExternalKind {
@@ -127,14 +126,6 @@ message RefType {
 message Version {
   required uint32 num = 1;
   required Encoding encoding = 2;
-}
-
-enum ValueType {
-  I32 = 1;
-  I64 = 2;
-  F32 = 3;
-  F64 = 4;
-  V128 = 5;
 }
 
 message FuncType {
@@ -238,7 +229,7 @@ message Element {
 
 message CodeSectionEntry {
   repeated Locals locals = 1;
-  required Expression body = 2; 
+  repeated Operator body = 2; 
 }
 
 message Locals {

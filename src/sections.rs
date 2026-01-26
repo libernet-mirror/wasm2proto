@@ -537,14 +537,19 @@ impl CodeSectionEntry {
                 value_type: ValueType::try_from(val_type)? as i32,
             });
         }
+        let mut operators: Vec<Operator> = Vec::new();
+        let reader = section.get_operators_reader()?;
+        for operator in reader {
+            operators.push(Operator::try_from(operator?)?);
+        }
         Ok(CodeSectionEntry {
             locals,
-            body: Expression::try_from(section.get_binary_reader_for_operators()?)?,
+            body: operators,
         })
     }
 
     fn render_wasm(&self, code_section: &mut wasm_encoder::CodeSection) -> Result<()> {
-        use wasm_encoder::{Function, ValType};
+        use wasm_encoder::{Function, Instruction, ValType};
         let mut locals: Vec<(u32, ValType)> = Vec::new();
         for local in &self.locals {
             locals.push((
@@ -553,7 +558,10 @@ impl CodeSectionEntry {
             ));
         }
         let mut function = Function::new(locals);
-        function.raw(self.body.bytecode.clone());
+        for operator in &self.body {
+            let instruction = Instruction::try_from(operator.clone())?;
+            function.instruction(&instruction);
+        }
         code_section.function(&function);
         Ok(())
     }
