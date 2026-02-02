@@ -48,7 +48,8 @@ enum ElementKindType {
 }
 
 message ElementKind {
-  required ElementKindType ty = 1;
+  // REQUIRED
+  optional ElementKindType ty = 1;
   optional uint32 table_index = 2;
   optional Expression expression = 3;
 }
@@ -59,7 +60,8 @@ enum DataKindType {
 }
 
 message DataKind {
-  required DataKindType ty = 1;
+  // REQUIRED
+  optional DataKindType ty = 1;
   optional uint32 memory_index = 2;
   optional Expression expression = 3;
 }
@@ -69,8 +71,10 @@ message Expression {
 }
 
 message Version {
-  required uint32 num = 1;
-  required Encoding encoding = 2;
+  // REQUIRED
+  optional uint32 num = 1;
+  // REQUIRED
+  optional Encoding encoding = 2;
 }
 
 message FuncType {
@@ -89,9 +93,12 @@ message TypeSection {
 }
 
 message TypeRefFunc {
-  required string module = 1;
-  required string name = 2;
-  required uint32 ftype = 3;
+  // REQUIRED
+  optional string module = 1;
+  // REQUIRED
+  optional string name = 2;
+  // REQUIRED
+  optional uint32 ftype = 3;
 }
 
 message ImportSection {
@@ -107,11 +114,15 @@ message TableSection {
 }
 
 message TableType {
-  required ERefType ref_type = 1;
-  required bool table64 = 2;
-  required uint64 initial = 3;
+  // REQUIRED
+  optional ERefType ref_type = 1;
+  // REQUIRED
+  optional bool table64 = 2;
+  // REQUIRED
+  optional uint64 initial = 3;
   optional uint64 maximum = 4;
-  required bool shared = 5;
+  // REQUIRED
+  optional bool shared = 5;
 }
 
 message MemorySection {
@@ -119,22 +130,30 @@ message MemorySection {
 }
 
 message MemoryType {
-  required bool memory64 = 1;
-  required bool shared = 2;
-  required uint64 initial = 3;
+  // REQUIRED
+  optional bool memory64 = 1;
+  // REQUIRED
+  optional bool shared = 2;
+  // REQUIRED
+  optional uint64 initial = 3;
   optional uint64 maximum = 4;
   optional uint32 page_size_log2 = 5;
 }
 
 message GlobalType {
-  required ValueType content_type = 1;
-  required bool mutable = 2;
-  required bool shared = 3;
+  // REQUIRED
+  optional ValueType content_type = 1;
+  // REQUIRED
+  optional bool mutable = 2;
+  // REQUIRED
+  optional bool shared = 3;
 }
 
 message Global {
-  required GlobalType ty = 1;
-  required Expression init_expr = 2;
+  // REQUIRED
+  optional GlobalType ty = 1;
+  // REQUIRED
+  optional Expression init_expr = 2;
 }
 
 message GlobalSection {
@@ -142,9 +161,12 @@ message GlobalSection {
 }
 
 message Export {
-  required string name = 1;
-  required ExternalKind kind = 2;
-  required uint32 index = 3;
+  // REQUIRED 
+  optional string name = 1;
+  // REQUIRED 
+  optional ExternalKind kind = 2;
+  // REQUIRED 
+  optional uint32 index = 3;
 }
 
 message ExportSection {
@@ -160,12 +182,14 @@ message ElementFunctions {
 }
 
 message ElementExpressions {
-  required ERefType ref_type = 1;
+  // REQUIRED
+  optional ERefType ref_type = 1;
   repeated Expression expressions = 2;
 }
 
 message Element {
-  required ElementKind kind = 1;
+  // REQUIRED
+  optional ElementKind kind = 1;
   oneof items {
     ElementFunctions functions = 2;
     ElementExpressions expressions = 3;
@@ -178,14 +202,18 @@ message CodeSectionEntry {
 }
 
 message Locals {
-  required uint32 count = 1;
-  required ValueType value_type = 2;
+  // REQUIRED
+  optional uint32 count = 1;
+  // REQUIRED
+  optional ValueType value_type = 2;
 }
 
 
 message Data {
-  required DataKind kind = 1;
-  required bytes data = 2;
+  // REQUIRED
+  optional DataKind kind = 1;
+  // REQUIRED
+  optional bytes data = 2;
 }
 
 message DataSection {
@@ -222,7 +250,9 @@ message Section {
 }
 
 message ProgramModule {
-  required uint32 protocol_version = 1;
-  required Version version = 2;
+  // REQUIRED
+  optional uint32 protocol_version = 1;
+  // REQUIRED
+  optional Version version = 2;
   repeated Section sections = 3;
 }

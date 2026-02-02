@@ -75,7 +75,10 @@ impl TryFrom<ValueType> for wasm_encoder::ValType {
             EValueType::F32 => Ok(wasm_encoder::ValType::F32),
             EValueType::F64 => Ok(wasm_encoder::ValType::F64),
             EValueType::V128 => Ok(wasm_encoder::ValType::V128),
-            EValueType::Ref => Ok(wasm_encoder::ValType::Ref(ERefType::try_from(value_type.ref_type.ok_or(anyhow!("Ref type not found"))?)?.try_into()?)),
+            EValueType::Ref => Ok(wasm_encoder::ValType::Ref(
+                ERefType::try_from(value_type.ref_type.ok_or(anyhow!("Ref type not found"))?)?
+                    .try_into()?,
+            )),
         }
     }
 }
@@ -148,7 +151,7 @@ impl TryFrom<wasmparser::ElementKind<'_>> for ElementKind {
     fn try_from(element_kind: wasmparser::ElementKind) -> Result<Self> {
         match element_kind {
             wasmparser::ElementKind::Passive => Ok(ElementKind {
-                ty: ElementKindType::ElPassive as i32,
+                ty: Some(ElementKindType::ElPassive as i32),
                 table_index: None,
                 expression: None,
             }),
@@ -156,12 +159,12 @@ impl TryFrom<wasmparser::ElementKind<'_>> for ElementKind {
                 table_index,
                 offset_expr,
             } => Ok(ElementKind {
-                ty: ElementKindType::ElActive as i32,
+                ty: Some(ElementKindType::ElActive as i32),
                 table_index,
                 expression: Some(Expression::try_from(offset_expr)?),
             }),
             wasmparser::ElementKind::Declared => Ok(ElementKind {
-                ty: ElementKindType::ElDeclared as i32,
+                ty: Some(ElementKindType::ElDeclared as i32),
                 table_index: None,
                 expression: None,
             }),
@@ -175,7 +178,7 @@ impl TryFrom<wasmparser::DataKind<'_>> for DataKind {
     fn try_from(element_kind: wasmparser::DataKind) -> Result<Self> {
         match element_kind {
             wasmparser::DataKind::Passive => Ok(DataKind {
-                ty: DataKindType::Passive as i32,
+                ty: Some(DataKindType::Passive as i32),
                 memory_index: None,
                 expression: None,
             }),
@@ -183,7 +186,7 @@ impl TryFrom<wasmparser::DataKind<'_>> for DataKind {
                 memory_index,
                 offset_expr,
             } => Ok(DataKind {
-                ty: DataKindType::Active as i32,
+                ty: Some(DataKindType::Active as i32),
                 memory_index: Some(memory_index),
                 expression: Some(Expression::try_from(offset_expr)?),
             }),
@@ -201,54 +204,96 @@ mod tests {
 
         assert!(matches!(
             ValueType::try_from(ValType::I32).unwrap(),
-            ValueType { val_type: Some(1), ref_type: None }
+            ValueType {
+                val_type: Some(1),
+                ref_type: None
+            }
         ));
         assert!(matches!(
             ValueType::try_from(ValType::I64).unwrap(),
-            ValueType { val_type: Some(2), ref_type: None }
+            ValueType {
+                val_type: Some(2),
+                ref_type: None
+            }
         ));
         assert!(matches!(
             ValueType::try_from(ValType::F32).unwrap(),
-            ValueType { val_type: Some(3), ref_type: None }
+            ValueType {
+                val_type: Some(3),
+                ref_type: None
+            }
         ));
         assert!(matches!(
             ValueType::try_from(ValType::F64).unwrap(),
-            ValueType { val_type: Some(4), ref_type: None }
+            ValueType {
+                val_type: Some(4),
+                ref_type: None
+            }
         ));
         assert!(matches!(
             ValueType::try_from(ValType::V128).unwrap(),
-            ValueType { val_type: Some(5), ref_type: None }
+            ValueType {
+                val_type: Some(5),
+                ref_type: None
+            }
         ));
         assert!(matches!(
             ValueType::try_from(ValType::Ref(wasmparser::RefType::FUNCREF)).unwrap(),
-            ValueType { val_type: Some(6), ref_type: Some(1) }
+            ValueType {
+                val_type: Some(6),
+                ref_type: Some(1)
+            }
         ));
     }
 
     #[test]
     fn test_valtype_to_wasm_encoder() {
         assert!(matches!(
-            wasm_encoder::ValType::try_from(ValueType { val_type: Some(EValueType::I32 as i32), ref_type: None }).unwrap(),
+            wasm_encoder::ValType::try_from(ValueType {
+                val_type: Some(EValueType::I32 as i32),
+                ref_type: None
+            })
+            .unwrap(),
             wasm_encoder::ValType::I32
         ));
         assert!(matches!(
-            wasm_encoder::ValType::try_from(ValueType { val_type: Some(EValueType::I64 as i32), ref_type: None }).unwrap(),
+            wasm_encoder::ValType::try_from(ValueType {
+                val_type: Some(EValueType::I64 as i32),
+                ref_type: None
+            })
+            .unwrap(),
             wasm_encoder::ValType::I64
         ));
         assert!(matches!(
-            wasm_encoder::ValType::try_from(ValueType { val_type: Some(EValueType::F32 as i32), ref_type: None }).unwrap(),
+            wasm_encoder::ValType::try_from(ValueType {
+                val_type: Some(EValueType::F32 as i32),
+                ref_type: None
+            })
+            .unwrap(),
             wasm_encoder::ValType::F32
         ));
         assert!(matches!(
-            wasm_encoder::ValType::try_from(ValueType { val_type: Some(EValueType::F64 as i32), ref_type: None }).unwrap(),
+            wasm_encoder::ValType::try_from(ValueType {
+                val_type: Some(EValueType::F64 as i32),
+                ref_type: None
+            })
+            .unwrap(),
             wasm_encoder::ValType::F64
         ));
         assert!(matches!(
-            wasm_encoder::ValType::try_from(ValueType { val_type: Some(EValueType::V128 as i32), ref_type: None }).unwrap(),
+            wasm_encoder::ValType::try_from(ValueType {
+                val_type: Some(EValueType::V128 as i32),
+                ref_type: None
+            })
+            .unwrap(),
             wasm_encoder::ValType::V128
         ));
         assert!(matches!(
-            wasm_encoder::ValType::try_from(ValueType { val_type: Some(EValueType::Ref as i32), ref_type: Some(ERefType::RefFunc as i32) }).unwrap(),
+            wasm_encoder::ValType::try_from(ValueType {
+                val_type: Some(EValueType::Ref as i32),
+                ref_type: Some(ERefType::RefFunc as i32)
+            })
+            .unwrap(),
             wasm_encoder::ValType::Ref(wasm_encoder::RefType::FUNCREF)
         ));
     }
@@ -303,5 +348,4 @@ mod tests {
         // Test unsupported ExtFuncExact
         assert!(wasm_encoder::ExportKind::try_from(ExternalKind::ExtFuncExact).is_err());
     }
-
 }

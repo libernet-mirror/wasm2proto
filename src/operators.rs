@@ -10,9 +10,9 @@ impl TryFrom<wasmparser::BlockType> for BlockType {
                 blockty: Some(block_type::Blockty::Empty(0)),
             }),
             wasmparser::BlockType::Type(valtype) => Ok(BlockType {
-                blockty: Some(block_type::Blockty::ValueType(
-                    ValueType::try_from(valtype)?,
-                )),
+                blockty: Some(block_type::Blockty::ValueType(ValueType::try_from(
+                    valtype,
+                )?)),
             }),
             wasmparser::BlockType::FuncType(funcidx) => Ok(BlockType {
                 blockty: Some(block_type::Blockty::FuncType(funcidx)),
@@ -29,9 +29,7 @@ impl TryFrom<BlockType> for wasm_encoder::BlockType {
         use wasm_encoder::BlockType;
         match blocktype.blockty.ok_or(anyhow!("Block type not found"))? {
             Blockty::Empty(0) => Ok(BlockType::Empty),
-            Blockty::ValueType(valtype) => {
-                Ok(BlockType::Result(ValueType::try_from(valtype)?.try_into()?))
-            }
+            Blockty::ValueType(valtype) => Ok(BlockType::Result(valtype.try_into()?)),
             Blockty::FuncType(funcidx) => Ok(BlockType::FunctionType(funcidx)),
             _ => Err(anyhow!("Unsupported block type: {:?}", blocktype)),
         }
@@ -92,7 +90,9 @@ impl TryFrom<wasmparser::Catch> for CatchElement {
                 catch: Some(catch_element::Catch::All(CatchAllEl { label: Some(label) })),
             }),
             wasmparser::Catch::AllRef { label } => Ok(CatchElement {
-                catch: Some(catch_element::Catch::AllRef(CatchAllRef { label: Some(label) })),
+                catch: Some(catch_element::Catch::AllRef(CatchAllRef {
+                    label: Some(label),
+                })),
             }),
         }
     }
@@ -1669,10 +1669,7 @@ impl TryFrom<Operator> for wasm_encoder::Instruction<'_> {
             }
             OpCode::ThrowRef => Ok(wasm_encoder::Instruction::ThrowRef),
             OpCode::Try => {
-                let ty = match operator
-                    .operator
-                    .ok_or(anyhow!("Try operator not found"))?
-                {
+                let ty = match operator.operator.ok_or(anyhow!("Try operator not found"))? {
                     operator::Operator::Blockty(bt) => wasm_encoder::BlockType::try_from(bt)?,
                     _ => return Err(anyhow!("Expected BlockType for Try operator")),
                 };
@@ -1734,7 +1731,13 @@ mod tests {
         let result = BlockType::try_from(blockty).unwrap();
         match result.blockty {
             Some(block_type::Blockty::ValueType(valtype)) => {
-                assert_eq!(valtype, ValueType { val_type: Some(EValueType::I32 as i32), ref_type: None });
+                assert_eq!(
+                    valtype,
+                    ValueType {
+                        val_type: Some(EValueType::I32 as i32),
+                        ref_type: None
+                    }
+                );
             }
             _ => panic!("Expected ValueType variant"),
         }
@@ -1764,7 +1767,10 @@ mod tests {
     #[test]
     fn test_blocktype_to_wasm_encoder_type() {
         let blocktype = BlockType {
-            blockty: Some(block_type::Blockty::ValueType(ValueType { val_type: Some(EValueType::I32 as i32), ref_type: None })),
+            blockty: Some(block_type::Blockty::ValueType(ValueType {
+                val_type: Some(EValueType::I32 as i32),
+                ref_type: None,
+            })),
         };
         let result = wasm_encoder::BlockType::try_from(blocktype).unwrap();
         match result {

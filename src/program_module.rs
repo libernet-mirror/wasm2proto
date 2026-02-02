@@ -15,8 +15,8 @@ pub fn from_wasm(bytes: &[u8]) -> Result<ProgramModule> {
     }
 
     Ok(ProgramModule {
-        protocol_version: 1,
-        version: version.ok_or(anyhow!("Version not found"))?,
+        protocol_version: Some(1),
+        version: Some(version.ok_or(anyhow!("Version not found"))?),
         sections: proto_sections,
     })
 }

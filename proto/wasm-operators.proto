@@ -328,9 +328,6 @@ message ThrowOp {
     optional uint32 tag_index = 1;
 }
 
-message ThrowRefOp {
-}
-
 message Operator {
     optional OpCode opcode = 1;
     oneof operator {

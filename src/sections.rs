@@ -31,9 +31,9 @@ impl Section {
                 )),
             })),
             Payload::TagSection(section) => Ok(Some(Section {
-                section: Some(section::Section::TagSection(
-                    TagSection::from_wasmparser(section)?,
-                )),
+                section: Some(section::Section::TagSection(TagSection::from_wasmparser(
+                    section,
+                )?)),
             })),
             Payload::GlobalSection(section) => Ok(Some(Section {
                 section: Some(section::Section::GlobalSection(
@@ -118,9 +118,7 @@ impl Section {
             Some(section::Section::CodeSectionEntry(code_section_entry)) => {
                 code_section_entry.render_wasm(code_section)
             }
-            Some(section::Section::TagSection(tag_section)) => {
-                tag_section.render_wasm(module)
-            }
+            Some(section::Section::TagSection(tag_section)) => tag_section.render_wasm(module),
             Some(section::Section::DataSection(data_section)) => data_section.render_wasm(module),
             _ => bail!("render_wasm: is not supported for section {:?}", self),
         }
@@ -141,8 +139,8 @@ impl Version {
                 }
 
                 Ok(Some(Version {
-                    num: num as u32,
-                    encoding: encoding as i32,
+                    num: Some(num as u32),
+                    encoding: Some(encoding as i32),
                 }))
             }
             _ => Ok(None),
@@ -205,11 +203,11 @@ impl TypeSection {
                 Some(sub_type::Kind::Func(ft)) => {
                     let mut params: Vec<ValType> = Vec::new();
                     for p in &ft.params {
-                        params.push(ValueType::try_from(*p)?.try_into()?);
+                        params.push((*p).try_into()?);
                     }
                     let mut results: Vec<ValType> = Vec::new();
                     for r in &ft.results {
-                        results.push(ValueType::try_from(*r)?.try_into()?);
+                        results.push((*r).try_into()?);
                     }
                     let ty = &SubType {
                         is_final: true,
@@ -249,9 +247,9 @@ impl ImportSection {
                     match import.ty {
                         TypeRef::Func(ftype) => {
                             refs.push(TypeRefFunc {
-                                module,
-                                name,
-                                ftype,
+                                module: Some(module),
+                                name: Some(name),
+                                ftype: Some(ftype),
                             });
                         }
                         _ => bail!("ImportSection: only Func type imports are supported"),
@@ -271,9 +269,17 @@ impl ImportSection {
         let mut imports = ImportSection::new();
         for import in &self.imports {
             imports.import(
-                import.module.as_str(),
-                import.name.as_str(),
-                EntityType::Function(import.ftype),
+                import
+                    .module
+                    .as_ref()
+                    .ok_or(anyhow!("Module not found"))?
+                    .as_str(),
+                import
+                    .name
+                    .as_ref()
+                    .ok_or(anyhow!("Name not found"))?
+                    .as_str(),
+                EntityType::Function(import.ftype.ok_or(anyhow!("Function type not found"))?),
             );
         }
         module.section(&imports);
@@ -317,11 +323,11 @@ impl TableSection {
             }
 
             proto_tables.push(TableType {
-                ref_type: ERefType::try_from(table.ty.element_type)? as i32,
-                table64: table.ty.table64,
-                initial: table.ty.initial,
+                ref_type: Some(ERefType::try_from(table.ty.element_type)? as i32),
+                table64: Some(table.ty.table64),
+                initial: Some(table.ty.initial),
                 maximum: table.ty.maximum,
-                shared: table.ty.shared,
+                shared: Some(table.ty.shared),
             });
         }
         Ok(TableSection {
@@ -333,13 +339,13 @@ impl TableSection {
         use wasm_encoder::{TableSection, TableType};
         let mut table_types = TableSection::new();
         for ty in &self.types {
-            let ref_type = ERefType::try_from(ty.ref_type)?;
+            let ref_type = ERefType::try_from(ty.ref_type.ok_or(anyhow!("Ref type not found"))?)?;
             table_types.table(TableType {
                 element_type: ref_type.try_into()?,
-                table64: ty.table64,
-                minimum: ty.initial,
+                table64: ty.table64.ok_or(anyhow!("Table64 not found"))?,
+                minimum: ty.initial.ok_or(anyhow!("Initial not found"))?,
                 maximum: ty.maximum,
-                shared: ty.shared,
+                shared: ty.shared.ok_or(anyhow!("Shared not found"))?,
             });
         }
         module.section(&table_types);
@@ -355,9 +361,9 @@ impl MemorySection {
         for memory in section {
             let memory = memory?;
             memory_types.push(MemoryType {
-                memory64: memory.memory64,
-                shared: memory.shared,
-                initial: memory.initial,
+                memory64: Some(memory.memory64),
+                shared: Some(memory.shared),
+                initial: Some(memory.initial),
                 maximum: memory.maximum,
                 page_size_log2: memory.page_size_log2,
             })
@@ -369,9 +375,9 @@ impl MemorySection {
         let mut types = MemorySection::new();
         for memory in &self.memory_types {
             types.memory(wasm_encoder::MemoryType {
-                memory64: memory.memory64,
-                shared: memory.shared,
-                minimum: memory.initial,
+                memory64: memory.memory64.ok_or(anyhow!("Memory64 not found"))?,
+                shared: memory.shared.ok_or(anyhow!("Shared not found"))?,
+                minimum: memory.initial.ok_or(anyhow!("Initial not found"))?,
                 maximum: memory.maximum,
                 page_size_log2: memory.page_size_log2,
             });
@@ -389,12 +395,12 @@ impl GlobalSection {
         for global in section {
             let global = global?;
             globals.push(Global {
-                ty: GlobalType {
-                    content_type: ValueType::try_from(global.ty.content_type)?,
-                    mutable: global.ty.mutable,
-                    shared: global.ty.shared,
-                },
-                init_expr: global.init_expr.try_into()?,
+                ty: Some(GlobalType {
+                    content_type: Some(ValueType::try_from(global.ty.content_type)?),
+                    mutable: Some(global.ty.mutable),
+                    shared: Some(global.ty.shared),
+                }),
+                init_expr: Some(global.init_expr.try_into()?),
             });
         }
         Ok(GlobalSection { globals })
@@ -403,13 +409,21 @@ impl GlobalSection {
         use wasm_encoder::{ConstExpr, GlobalSection, GlobalType};
         let mut globals = GlobalSection::new();
         for global in &self.globals {
+            let ty = global.ty.as_ref().ok_or(anyhow!("Global type not found"))?;
+            let init_expr = global
+                .init_expr
+                .clone()
+                .ok_or(anyhow!("Init expr not found"))?;
             globals.global(
                 GlobalType {
-                    val_type: ValueType::try_from(global.ty.content_type)?.try_into()?,
-                    mutable: global.ty.mutable,
-                    shared: global.ty.shared,
+                    val_type: ty
+                        .content_type
+                        .ok_or(anyhow!("Content type not found"))?
+                        .try_into()?,
+                    mutable: ty.mutable.ok_or(anyhow!("Mutable not found"))?,
+                    shared: ty.shared.ok_or(anyhow!("Shared not found"))?,
                 },
-                &ConstExpr::try_from(global.init_expr.clone())?,
+                &ConstExpr::try_from(init_expr)?,
             );
         }
         module.section(&globals);
@@ -425,9 +439,9 @@ impl ExportSection {
         for export in section {
             let export = export?;
             exports.push(Export {
-                name: export.name.to_string(),
-                kind: ExternalKind::try_from(export.kind)? as i32,
-                index: export.index,
+                name: Some(export.name.to_string()),
+                kind: Some(ExternalKind::try_from(export.kind)? as i32),
+                index: Some(export.index),
             });
         }
 
@@ -438,9 +452,14 @@ impl ExportSection {
         let mut exports = ExportSection::new();
         for export in &self.exports {
             exports.export(
-                export.name.as_str(),
-                ExternalKind::try_from(export.kind)?.try_into()?,
-                export.index,
+                export
+                    .name
+                    .as_ref()
+                    .ok_or(anyhow!("Name not found"))?
+                    .as_str(),
+                ExternalKind::try_from(export.kind.ok_or(anyhow!("Kind not found"))?)?
+                    .try_into()?,
+                export.index.ok_or(anyhow!("Index not found"))?,
             );
         }
         module.section(&exports);
@@ -471,14 +490,14 @@ impl ElementSection {
                         expressions.push(Expression::try_from(expression?)?);
                     }
                     element::Items::Expressions(ElementExpressions {
-                        ref_type: ERefType::try_from(ref_type)? as i32,
+                        ref_type: Some(ERefType::try_from(ref_type)? as i32),
                         expressions,
                     })
                 }
             };
 
             elements.push(Element {
-                kind: ElementKind::try_from(element.kind)?,
+                kind: Some(ElementKind::try_from(element.kind)?),
                 items: Some(items),
             });
         }
@@ -492,14 +511,14 @@ impl ElementSection {
         };
         let mut elements = ElementSection::new();
         for element in &self.elements {
-            let element_mode = match ElementKindType::try_from(element.kind.ty)? {
+            let kind = element.kind.as_ref().ok_or(anyhow!("Kind not found"))?;
+            let ty = kind.ty.ok_or(anyhow!("Element kind type not found"))?;
+            let element_mode = match ElementKindType::try_from(ty)? {
                 ElementKindType::ElPassive => ElementMode::Passive,
                 ElementKindType::ElActive => ElementMode::Active {
-                    table: element.kind.table_index,
+                    table: kind.table_index,
                     offset: &ConstExpr::try_from(
-                        element
-                            .kind
-                            .expression
+                        kind.expression
                             .as_ref()
                             .ok_or(anyhow!("Expression not found"))?
                             .clone(),
@@ -517,7 +536,9 @@ impl ElementSection {
                         instructions.push(ConstExpr::try_from(expression.clone())?);
                     }
                     Elements::Expressions(
-                        RefType::try_from(ERefType::try_from(expressions.ref_type)?)?,
+                        RefType::try_from(ERefType::try_from(
+                            expressions.ref_type.ok_or(anyhow!("Ref type not found"))?,
+                        )?)?,
                         instructions.into(),
                     )
                 }
@@ -539,8 +560,8 @@ impl CodeSectionEntry {
             let (count, val_type) = local?;
 
             locals.push(Locals {
-                count,
-                value_type: ValueType::try_from(val_type)?,
+                count: Some(count),
+                value_type: Some(ValueType::try_from(val_type)?),
             });
         }
         let mut operators: Vec<Operator> = Vec::new();
@@ -559,8 +580,11 @@ impl CodeSectionEntry {
         let mut locals: Vec<(u32, ValType)> = Vec::new();
         for local in &self.locals {
             locals.push((
-                local.count,
-                ValueType::try_from(local.value_type)?.try_into()?,
+                local.count.ok_or(anyhow!("Count not found"))?,
+                local
+                    .value_type
+                    .ok_or(anyhow!("Value type not found"))?
+                    .try_into()?,
             ));
         }
         let mut function = Function::new(locals);
@@ -581,8 +605,8 @@ impl DataSection {
         for data in section {
             let data = data?;
             datas.push(Data {
-                kind: DataKind::try_from(data.kind)?,
-                data: data.data.to_vec(),
+                kind: Some(DataKind::try_from(data.kind)?),
+                data: Some(data.data.to_vec()),
             });
         }
 
@@ -592,16 +616,14 @@ impl DataSection {
         use wasm_encoder::{ConstExpr, DataSection, DataSegment, DataSegmentMode};
         let mut section = DataSection::new();
         for data in &self.datas {
-            let data_mode = match DataKindType::try_from(data.kind.ty)? {
+            let kind = data.kind.as_ref().ok_or(anyhow!("Kind not found"))?;
+            let ty = kind.ty.ok_or(anyhow!("Data kind type not found"))?;
+            let data_mode = match DataKindType::try_from(ty)? {
                 DataKindType::Passive => DataSegmentMode::Passive,
                 DataKindType::Active => DataSegmentMode::Active {
-                    memory_index: data
-                        .kind
-                        .memory_index
-                        .ok_or(anyhow!("Memory index not found"))?,
+                    memory_index: kind.memory_index.ok_or(anyhow!("Memory index not found"))?,
                     offset: &ConstExpr::try_from(
-                        data.kind
-                            .expression
+                        kind.expression
                             .as_ref()
                             .ok_or(anyhow!("Expression not found"))?
                             .clone(),
@@ -610,7 +632,7 @@ impl DataSection {
             };
             section.segment(DataSegment {
                 mode: data_mode,
-                data: data.data.clone(),
+                data: data.data.clone().ok_or(anyhow!("Data not found"))?,
             });
         }
         module.section(&section);
@@ -619,30 +641,34 @@ impl DataSection {
 }
 
 impl TagSection {
-  fn from_wasmparser(section: wasmparser::SectionLimited<'_, wasmparser::TagType>) -> Result<TagSection> {
-    let mut tags: Vec<TagType> = Vec::new();
-    for tag in section {
-      let tag = tag?;
-      if tag.kind != wasmparser::TagKind::Exception {
-        bail!("Only Exception tags are supported");
-      }
-      tags.push(TagType {
-        kind: Some(TagKind::TkException as i32),
-        func_type_idx: Some(tag.func_type_idx),
-      });
+    fn from_wasmparser(
+        section: wasmparser::SectionLimited<'_, wasmparser::TagType>,
+    ) -> Result<TagSection> {
+        let mut tags: Vec<TagType> = Vec::new();
+        for tag in section {
+            let tag = tag?;
+            if tag.kind != wasmparser::TagKind::Exception {
+                bail!("Only Exception tags are supported");
+            }
+            tags.push(TagType {
+                kind: Some(TagKind::TkException as i32),
+                func_type_idx: Some(tag.func_type_idx),
+            });
+        }
+        Ok(TagSection { tags })
     }
-    Ok(TagSection { tags })
-  }
-  fn render_wasm(&self, module: &mut wasm_encoder::Module) -> Result<()> {
-    use wasm_encoder::{ TagSection, TagType, TagKind };
-    let mut tags = TagSection::new();
-    for tag in &self.tags {
-      tags.tag(TagType {
-        kind: TagKind::Exception,
-        func_type_idx: tag.func_type_idx.ok_or(anyhow!("Func type index not found"))?,
-      });
+    fn render_wasm(&self, module: &mut wasm_encoder::Module) -> Result<()> {
+        use wasm_encoder::{TagKind, TagSection, TagType};
+        let mut tags = TagSection::new();
+        for tag in &self.tags {
+            tags.tag(TagType {
+                kind: TagKind::Exception,
+                func_type_idx: tag
+                    .func_type_idx
+                    .ok_or(anyhow!("Func type index not found"))?,
+            });
+        }
+        module.section(&tags);
+        Ok(())
     }
-    module.section(&tags);
-    Ok(())
-  }
 }

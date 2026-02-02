@@ -13,7 +13,6 @@ enum ERefType {
   RefFunc = 1;
 }
 
-
 message ValueType {
   // REQUIRED
   optional EValueType val_type = 1;

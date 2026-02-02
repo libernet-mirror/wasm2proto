@@ -41,20 +41,20 @@ fn main() {
         proto_bytes.len()
     );
 
-
-    let features = wasmparser::WasmFeatures::default() | 
-        wasmparser::WasmFeatures::EXCEPTIONS |
-        wasmparser::WasmFeatures::LEGACY_EXCEPTIONS |
-        wasmparser::WasmFeatures::BULK_MEMORY |
-        wasmparser::WasmFeatures::SIGN_EXTENSION |
-        wasmparser::WasmFeatures::SATURATING_FLOAT_TO_INT;
+    let features = wasmparser::WasmFeatures::default()
+        | wasmparser::WasmFeatures::EXCEPTIONS
+        | wasmparser::WasmFeatures::LEGACY_EXCEPTIONS
+        | wasmparser::WasmFeatures::BULK_MEMORY
+        | wasmparser::WasmFeatures::SIGN_EXTENSION
+        | wasmparser::WasmFeatures::SATURATING_FLOAT_TO_INT;
     let mut validator = wasmparser::Validator::new_with_features(features);
     let parser = wasmparser::Parser::new(0);
     parser.parse_all(&out_bytes).for_each(|payload| {
         if let Ok(payload) = payload
-            && let Err(e) = validator.payload(&payload) {
-                eprintln!("WASM validation error: {:?}", e);
-                std::process::exit(1);
-            }
+            && let Err(e) = validator.payload(&payload)
+        {
+            eprintln!("WASM validation error: {:?}", e);
+            std::process::exit(1);
+        }
     });
 }
