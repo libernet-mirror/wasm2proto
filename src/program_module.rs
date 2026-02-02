@@ -181,12 +181,10 @@ mod tests {
 
         // Should have sections including export section
         assert!(!program.sections.is_empty());
-        let has_export_section = program.sections.iter().any(|s| {
-            matches!(
-                s.section,
-                Some(section::Section::ExportSection(_))
-            )
-        });
+        let has_export_section = program
+            .sections
+            .iter()
+            .any(|s| matches!(s.section, Some(section::Section::ExportSection(_))));
         assert!(has_export_section);
     }
 
@@ -202,7 +200,12 @@ mod tests {
         assert!(!rendered_bytes.is_empty());
 
         // Rendered WASM should be valid
-        assert!(wasmparser::Parser::new(0).parse_all(&rendered_bytes).next().is_some());
+        assert!(
+            wasmparser::Parser::new(0)
+                .parse_all(&rendered_bytes)
+                .next()
+                .is_some()
+        );
     }
 
     #[test]
@@ -261,12 +264,10 @@ mod tests {
 
         let round_trip = round_trip_program.unwrap();
         // Check that export section is preserved
-        let has_export_section = round_trip.sections.iter().any(|s| {
-            matches!(
-                s.section,
-                Some(section::Section::ExportSection(_))
-            )
-        });
+        let has_export_section = round_trip
+            .sections
+            .iter()
+            .any(|s| matches!(s.section, Some(section::Section::ExportSection(_))));
         assert!(has_export_section);
     }
 

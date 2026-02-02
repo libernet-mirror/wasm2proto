@@ -355,4 +355,292 @@ mod tests {
         // Test unsupported ExtFuncExact
         assert!(wasm_encoder::ExportKind::try_from(ExternalKind::ExtFuncExact).is_err());
     }
+
+    #[test]
+    fn test_reftype_from_wasmparser_funcref() {
+        let ref_type = wasmparser::RefType::FUNCREF;
+        let result = ERefType::try_from(ref_type).unwrap();
+        assert_eq!(result, ERefType::RefFunc);
+    }
+
+    #[test]
+    fn test_reftype_from_wasmparser_externref() {
+        let ref_type = wasmparser::RefType::EXTERNREF;
+        let result = ERefType::try_from(ref_type).unwrap();
+        assert_eq!(result, ERefType::ExternRef);
+    }
+
+    #[test]
+    fn test_reftype_to_wasm_encoder_funcref() {
+        let result = wasm_encoder::RefType::try_from(ERefType::RefFunc).unwrap();
+        assert_eq!(result, wasm_encoder::RefType::FUNCREF);
+    }
+
+    #[test]
+    fn test_reftype_to_wasm_encoder_externref() {
+        let result = wasm_encoder::RefType::try_from(ERefType::ExternRef).unwrap();
+        assert_eq!(result, wasm_encoder::RefType::EXTERNREF);
+    }
+
+    #[test]
+    fn test_expression_from_wasmparser_constexpr() {
+        use wasm_encoder::{ConstExpr, Instruction, Module};
+        use wasmparser::Parser;
+
+        // Create a simple const expression: i32.const 42
+        let mut module = Module::new();
+        let mut types = wasm_encoder::TypeSection::new();
+        types.ty().subtype(&wasm_encoder::SubType {
+            is_final: true,
+            supertype_idx: None,
+            composite_type: wasm_encoder::CompositeType {
+                inner: wasm_encoder::CompositeInnerType::Func(wasm_encoder::FuncType::new(
+                    vec![],
+                    vec![],
+                )),
+                shared: false,
+                descriptor: None,
+                describes: None,
+            },
+        });
+        module.section(&types);
+
+        let mut globals = wasm_encoder::GlobalSection::new();
+        let expr = ConstExpr::extended(vec![Instruction::I32Const(42), Instruction::End]);
+        globals.global(
+            wasm_encoder::GlobalType {
+                val_type: wasm_encoder::ValType::I32,
+                mutable: false,
+                shared: false,
+            },
+            &expr,
+        );
+        module.section(&globals);
+
+        let wasm_bytes = module.finish();
+        let parser = Parser::new(0);
+        for payload in parser.parse_all(&wasm_bytes) {
+            let payload = payload.unwrap();
+            if let wasmparser::Payload::GlobalSection(section) = payload {
+                for global in section {
+                    let global = global.unwrap();
+                    let result = Expression::try_from(global.init_expr).unwrap();
+                    assert!(!result.operators.is_empty());
+                    return;
+                }
+            }
+        }
+        panic!("GlobalSection not found");
+    }
+
+    #[test]
+    fn test_expression_to_wasm_encoder_constexpr() {
+        // Create an expression with operators
+        let expr = Expression {
+            operators: vec![Operator {
+                opcode: Some(OpCode::I32Const as i32),
+                operator: Some(operator::Operator::I32value(42)),
+            }],
+        };
+
+        // Verify conversion succeeds
+        let result = wasm_encoder::ConstExpr::try_from(expr);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_expression_to_wasm_encoder_constexpr_with_end() {
+        // Create an expression with End operator (should be removed)
+        let expr = Expression {
+            operators: vec![
+                Operator {
+                    opcode: Some(OpCode::I32Const as i32),
+                    operator: Some(operator::Operator::I32value(42)),
+                },
+                Operator {
+                    opcode: Some(OpCode::End as i32),
+                    ..Operator::default()
+                },
+            ],
+        };
+
+        // Verify conversion succeeds (End should be removed automatically)
+        let result = wasm_encoder::ConstExpr::try_from(expr);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_element_kind_from_wasmparser_passive() {
+        use wasmparser::ElementKind;
+
+        let element_kind = ElementKind::Passive;
+        let result = crate::program::ElementKind::try_from(element_kind).unwrap();
+        assert_eq!(result.ty, Some(ElementKindType::ElPassive as i32));
+        assert_eq!(result.table_index, None);
+        assert_eq!(result.expression, None);
+    }
+
+    #[test]
+    fn test_element_kind_from_wasmparser_active() {
+        use wasm_encoder::{
+            CompositeInnerType, CompositeType, ConstExpr, ElementMode, ElementSection,
+            ElementSegment, Elements, FunctionSection, Instruction, Module, RefType, SubType,
+            TableSection, TableType, TypeSection,
+        };
+        use wasmparser::Parser;
+
+        // Create a complete WASM module with an element section
+        let mut module = Module::new();
+
+        // Type section
+        let mut types = TypeSection::new();
+        types.ty().subtype(&SubType {
+            is_final: true,
+            supertype_idx: None,
+            composite_type: CompositeType {
+                inner: CompositeInnerType::Func(wasm_encoder::FuncType::new(vec![], vec![])),
+                shared: false,
+                descriptor: None,
+                describes: None,
+            },
+        });
+        module.section(&types);
+
+        // Function section
+        let mut functions = FunctionSection::new();
+        functions.function(0);
+        module.section(&functions);
+
+        // Table section
+        let mut tables = TableSection::new();
+        tables.table(TableType {
+            element_type: RefType::FUNCREF,
+            table64: false,
+            minimum: 10,
+            maximum: None,
+            shared: false,
+        });
+        module.section(&tables);
+
+        // Element section with Active mode
+        let mut elements = ElementSection::new();
+        let offset = ConstExpr::extended(vec![Instruction::I32Const(0)]);
+        elements.segment(ElementSegment {
+            mode: ElementMode::Active {
+                table: Some(0),
+                offset: &offset,
+            },
+            elements: Elements::Functions(vec![0].into()),
+        });
+        module.section(&elements);
+
+        let wasm_bytes = module.finish();
+        let parser = Parser::new(0);
+        for payload in parser.parse_all(&wasm_bytes) {
+            let payload = payload.unwrap();
+            if let wasmparser::Payload::ElementSection(section) = payload {
+                for element in section {
+                    let element = element.unwrap();
+                    let result = crate::program::ElementKind::try_from(element.kind).unwrap();
+                    assert_eq!(result.ty, Some(ElementKindType::ElActive as i32));
+                    assert_eq!(result.table_index, Some(0));
+                    assert!(result.expression.is_some());
+                    return;
+                }
+            }
+        }
+        panic!("ElementSection not found");
+    }
+
+    #[test]
+    fn test_element_kind_from_wasmparser_declared() {
+        use wasmparser::ElementKind;
+
+        let element_kind = ElementKind::Declared;
+        let result = crate::program::ElementKind::try_from(element_kind).unwrap();
+        assert_eq!(result.ty, Some(ElementKindType::ElDeclared as i32));
+        assert_eq!(result.table_index, None);
+        assert_eq!(result.expression, None);
+    }
+
+    #[test]
+    fn test_data_kind_from_wasmparser_passive() {
+        use wasmparser::DataKind;
+
+        let data_kind = DataKind::Passive;
+        let result = crate::program::DataKind::try_from(data_kind).unwrap();
+        assert_eq!(result.ty, Some(DataKindType::Passive as i32));
+        assert_eq!(result.memory_index, None);
+        assert_eq!(result.expression, None);
+    }
+
+    #[test]
+    fn test_data_kind_from_wasmparser_active() {
+        use wasm_encoder::{
+            ConstExpr, DataSection, DataSegment, DataSegmentMode, Instruction, MemorySection,
+            Module,
+        };
+        use wasmparser::Parser;
+
+        // Create a WASM module with a data section to get a real Active DataKind
+        let mut module = Module::new();
+
+        // Memory section (required for Active data segments)
+        let mut memories = MemorySection::new();
+        memories.memory(wasm_encoder::MemoryType {
+            memory64: false,
+            shared: false,
+            minimum: 1,
+            maximum: None,
+            page_size_log2: None,
+        });
+        module.section(&memories);
+
+        // Data section with Active mode
+        let mut data = DataSection::new();
+        let offset = ConstExpr::extended(vec![Instruction::I32Const(0)]);
+        data.segment(DataSegment {
+            mode: DataSegmentMode::Active {
+                memory_index: 0,
+                offset: &offset,
+            },
+            data: b"hello".to_vec(),
+        });
+        module.section(&data);
+
+        let wasm_bytes = module.finish();
+        let parser = Parser::new(0);
+        for payload in parser.parse_all(&wasm_bytes) {
+            let payload = payload.unwrap();
+            if let wasmparser::Payload::DataSection(section) = payload {
+                for data in section {
+                    let data = data.unwrap();
+                    let result = crate::program::DataKind::try_from(data.kind).unwrap();
+                    assert_eq!(result.ty, Some(DataKindType::Active as i32));
+                    assert_eq!(result.memory_index, Some(0));
+                    assert!(result.expression.is_some());
+                    return;
+                }
+            }
+        }
+        panic!("DataSection not found");
+    }
+
+    #[test]
+    fn test_valtype_to_wasm_encoder_missing_val_type() {
+        let result = wasm_encoder::ValType::try_from(ValueType {
+            val_type: None,
+            ref_type: None,
+        });
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_valtype_to_wasm_encoder_ref_missing_ref_type() {
+        let result = wasm_encoder::ValType::try_from(ValueType {
+            val_type: Some(EValueType::Ref as i32),
+            ref_type: None,
+        });
+        assert!(result.is_err());
+    }
 }
