@@ -2794,4 +2794,498 @@ mod tests {
         let result = wasm_encoder::BlockType::try_from(blocktype);
         assert!(result.is_err());
     }
+
+    // CatchElement tests
+    #[test]
+    fn test_catch_element_one() {
+        let catch = wasmparser::Catch::One { tag: 5, label: 10 };
+        let result = CatchElement::try_from(catch).unwrap();
+        match result.catch {
+            Some(catch_element::Catch::One(one)) => {
+                assert_eq!(one.tag, Some(5));
+                assert_eq!(one.label, Some(10));
+            }
+            _ => panic!("Expected Catch::One variant"),
+        }
+    }
+
+    #[test]
+    fn test_catch_element_one_ref() {
+        let catch = wasmparser::Catch::OneRef { tag: 3, label: 7 };
+        let result = CatchElement::try_from(catch).unwrap();
+        match result.catch {
+            Some(catch_element::Catch::OneRef(one_ref)) => {
+                assert_eq!(one_ref.tag, Some(3));
+                assert_eq!(one_ref.label, Some(7));
+            }
+            _ => panic!("Expected Catch::OneRef variant"),
+        }
+    }
+
+    #[test]
+    fn test_catch_element_all() {
+        let catch = wasmparser::Catch::All { label: 15 };
+        let result = CatchElement::try_from(catch).unwrap();
+        match result.catch {
+            Some(catch_element::Catch::All(all)) => {
+                assert_eq!(all.label, Some(15));
+            }
+            _ => panic!("Expected Catch::All variant"),
+        }
+    }
+
+    #[test]
+    fn test_catch_element_all_ref() {
+        let catch = wasmparser::Catch::AllRef { label: 20 };
+        let result = CatchElement::try_from(catch).unwrap();
+        match result.catch {
+            Some(catch_element::Catch::AllRef(all_ref)) => {
+                assert_eq!(all_ref.label, Some(20));
+            }
+            _ => panic!("Expected Catch::AllRef variant"),
+        }
+    }
+
+    // Exception-related operator tests
+    #[test]
+    fn test_operator_try() {
+        let op = wasmparser::Operator::Try {
+            blockty: wasmparser::BlockType::Empty,
+        };
+        let result = Operator::try_from(op).unwrap();
+        assert_eq!(result.opcode, Some(OpCode::Try as i32));
+        assert!(matches!(
+            result.operator,
+            Some(operator::Operator::Blockty(_))
+        ));
+    }
+
+    #[test]
+    fn test_operator_catch() {
+        let op = wasmparser::Operator::Catch { tag_index: 42 };
+        let result = Operator::try_from(op).unwrap();
+        assert_eq!(result.opcode, Some(OpCode::Catch as i32));
+        match result.operator {
+            Some(operator::Operator::TagIndex(idx)) => assert_eq!(idx, 42),
+            _ => panic!("Expected TagIndex"),
+        }
+    }
+
+    #[test]
+    fn test_operator_catch_all() {
+        let op = wasmparser::Operator::CatchAll {};
+        let result = Operator::try_from(op).unwrap();
+        assert_eq!(result.opcode, Some(OpCode::CatchAll as i32));
+    }
+
+    #[test]
+    fn test_operator_rethrow() {
+        let op = wasmparser::Operator::Rethrow { relative_depth: 3 };
+        let result = Operator::try_from(op).unwrap();
+        assert_eq!(result.opcode, Some(OpCode::Rethrow as i32));
+        match result.operator {
+            Some(operator::Operator::RelativeDepth(depth)) => assert_eq!(depth, 3),
+            _ => panic!("Expected RelativeDepth"),
+        }
+    }
+
+    #[test]
+    fn test_operator_delegate() {
+        let op = wasmparser::Operator::Delegate { relative_depth: 5 };
+        let result = Operator::try_from(op).unwrap();
+        assert_eq!(result.opcode, Some(OpCode::Delegate as i32));
+        match result.operator {
+            Some(operator::Operator::RelativeDepth(depth)) => assert_eq!(depth, 5),
+            _ => panic!("Expected RelativeDepth"),
+        }
+    }
+
+    #[test]
+    fn test_operator_throw() {
+        let op = wasmparser::Operator::Throw { tag_index: 7 };
+        let result = Operator::try_from(op).unwrap();
+        assert_eq!(result.opcode, Some(OpCode::Throw as i32));
+        match result.operator {
+            Some(operator::Operator::Throw(throw_op)) => {
+                assert_eq!(throw_op.tag_index, Some(7));
+            }
+            _ => panic!("Expected Throw operator"),
+        }
+    }
+
+    #[test]
+    fn test_operator_throw_ref() {
+        let op = wasmparser::Operator::ThrowRef {};
+        let result = Operator::try_from(op).unwrap();
+        assert_eq!(result.opcode, Some(OpCode::ThrowRef as i32));
+    }
+
+    // Additional reverse conversion tests (Operator -> wasm_encoder::Instruction)
+    #[test]
+    fn test_operator_to_instruction_loop() {
+        let blocktype = BlockType {
+            blockty: Some(block_type::Blockty::ValueType(ValueType {
+                val_type: Some(EValueType::I64 as i32),
+                ref_type: None,
+            })),
+        };
+        let op = Operator {
+            opcode: Some(OpCode::Loop as i32),
+            operator: Some(operator::Operator::Blockty(blocktype)),
+        };
+        let result = wasm_encoder::Instruction::try_from(op).unwrap();
+        assert!(matches!(result, wasm_encoder::Instruction::Loop(_)));
+    }
+
+    #[test]
+    fn test_operator_to_instruction_if() {
+        let blocktype = BlockType {
+            blockty: Some(block_type::Blockty::Empty(0)),
+        };
+        let op = Operator {
+            opcode: Some(OpCode::If as i32),
+            operator: Some(operator::Operator::Blockty(blocktype)),
+        };
+        let result = wasm_encoder::Instruction::try_from(op).unwrap();
+        assert!(matches!(result, wasm_encoder::Instruction::If(_)));
+    }
+
+    #[test]
+    fn test_operator_to_instruction_brif() {
+        let op = Operator {
+            opcode: Some(OpCode::BrIf as i32),
+            operator: Some(operator::Operator::RelativeDepth(10)),
+        };
+        let result = wasm_encoder::Instruction::try_from(op).unwrap();
+        match result {
+            wasm_encoder::Instruction::BrIf(depth) => assert_eq!(depth, 10),
+            _ => panic!("Expected BrIf instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_to_instruction_local_get() {
+        let op = Operator {
+            opcode: Some(OpCode::LocalGet as i32),
+            operator: Some(operator::Operator::LocalIndex(15)),
+        };
+        let result = wasm_encoder::Instruction::try_from(op).unwrap();
+        match result {
+            wasm_encoder::Instruction::LocalGet(idx) => assert_eq!(idx, 15),
+            _ => panic!("Expected LocalGet instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_to_instruction_local_set() {
+        let op = Operator {
+            opcode: Some(OpCode::LocalSet as i32),
+            operator: Some(operator::Operator::LocalIndex(20)),
+        };
+        let result = wasm_encoder::Instruction::try_from(op).unwrap();
+        match result {
+            wasm_encoder::Instruction::LocalSet(idx) => assert_eq!(idx, 20),
+            _ => panic!("Expected LocalSet instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_to_instruction_local_tee() {
+        let op = Operator {
+            opcode: Some(OpCode::LocalTee as i32),
+            operator: Some(operator::Operator::LocalIndex(25)),
+        };
+        let result = wasm_encoder::Instruction::try_from(op).unwrap();
+        match result {
+            wasm_encoder::Instruction::LocalTee(idx) => assert_eq!(idx, 25),
+            _ => panic!("Expected LocalTee instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_to_instruction_global_get() {
+        let op = Operator {
+            opcode: Some(OpCode::GlobalGet as i32),
+            operator: Some(operator::Operator::GlobalIndex(30)),
+        };
+        let result = wasm_encoder::Instruction::try_from(op).unwrap();
+        match result {
+            wasm_encoder::Instruction::GlobalGet(idx) => assert_eq!(idx, 30),
+            _ => panic!("Expected GlobalGet instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_to_instruction_global_set() {
+        let op = Operator {
+            opcode: Some(OpCode::GlobalSet as i32),
+            operator: Some(operator::Operator::GlobalIndex(35)),
+        };
+        let result = wasm_encoder::Instruction::try_from(op).unwrap();
+        match result {
+            wasm_encoder::Instruction::GlobalSet(idx) => assert_eq!(idx, 35),
+            _ => panic!("Expected GlobalSet instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_to_instruction_i64_const() {
+        let op = Operator {
+            opcode: Some(OpCode::I64Const as i32),
+            operator: Some(operator::Operator::I64value(-100)),
+        };
+        let result = wasm_encoder::Instruction::try_from(op).unwrap();
+        match result {
+            wasm_encoder::Instruction::I64Const(val) => assert_eq!(val, -100),
+            _ => panic!("Expected I64Const instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_to_instruction_f64_const() {
+        let bits = 2.718f64.to_bits();
+        let op = Operator {
+            opcode: Some(OpCode::F64Const as i32),
+            operator: Some(operator::Operator::F64value(bits)),
+        };
+        let result = wasm_encoder::Instruction::try_from(op).unwrap();
+        match result {
+            wasm_encoder::Instruction::F64Const(ieee) => {
+                assert_eq!(ieee.bits(), bits);
+            }
+            _ => panic!("Expected F64Const instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_to_instruction_memory_size() {
+        let op = Operator {
+            opcode: Some(OpCode::MemorySize as i32),
+            operator: Some(operator::Operator::Mem(0)),
+        };
+        let result = wasm_encoder::Instruction::try_from(op).unwrap();
+        match result {
+            wasm_encoder::Instruction::MemorySize(mem) => assert_eq!(mem, 0),
+            _ => panic!("Expected MemorySize instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_to_instruction_memory_grow() {
+        let op = Operator {
+            opcode: Some(OpCode::MemoryGrow as i32),
+            operator: Some(operator::Operator::Mem(1)),
+        };
+        let result = wasm_encoder::Instruction::try_from(op).unwrap();
+        match result {
+            wasm_encoder::Instruction::MemoryGrow(mem) => assert_eq!(mem, 1),
+            _ => panic!("Expected MemoryGrow instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_to_instruction_catch() {
+        let op = Operator {
+            opcode: Some(OpCode::Catch as i32),
+            operator: Some(operator::Operator::TagIndex(5)),
+        };
+        let result = wasm_encoder::Instruction::try_from(op).unwrap();
+        match result {
+            wasm_encoder::Instruction::Catch(tag_index) => assert_eq!(tag_index, 5),
+            _ => panic!("Expected Catch instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_to_instruction_catch_all() {
+        let op = Operator {
+            opcode: Some(OpCode::CatchAll as i32),
+            ..Operator::default()
+        };
+        let result = wasm_encoder::Instruction::try_from(op).unwrap();
+        assert!(matches!(result, wasm_encoder::Instruction::CatchAll));
+    }
+
+    #[test]
+    fn test_operator_to_instruction_memory_copy() {
+        let mc = MemoryCopyOp {
+            dst_mem: Some(0),
+            src_mem: Some(1),
+        };
+        let op = Operator {
+            opcode: Some(OpCode::MemoryCopy as i32),
+            operator: Some(operator::Operator::MemoryCopy(mc)),
+        };
+        let result = wasm_encoder::Instruction::try_from(op).unwrap();
+        match result {
+            wasm_encoder::Instruction::MemoryCopy { dst_mem, src_mem } => {
+                assert_eq!(dst_mem, 0);
+                assert_eq!(src_mem, 1);
+            }
+            _ => panic!("Expected MemoryCopy instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_to_instruction_memory_fill() {
+        let op = Operator {
+            opcode: Some(OpCode::MemoryFill as i32),
+            operator: Some(operator::Operator::Mem(2)),
+        };
+        let result = wasm_encoder::Instruction::try_from(op).unwrap();
+        match result {
+            wasm_encoder::Instruction::MemoryFill(mem) => assert_eq!(mem, 2),
+            _ => panic!("Expected MemoryFill instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_to_instruction_table_init() {
+        let ti = TableInitOp {
+            elem_index: Some(3),
+            table: Some(0),
+        };
+        let op = Operator {
+            opcode: Some(OpCode::TableInit as i32),
+            operator: Some(operator::Operator::TableInit(ti)),
+        };
+        let result = wasm_encoder::Instruction::try_from(op).unwrap();
+        match result {
+            wasm_encoder::Instruction::TableInit { elem_index, table } => {
+                assert_eq!(elem_index, 3);
+                assert_eq!(table, 0);
+            }
+            _ => panic!("Expected TableInit instruction"),
+        }
+    }
+
+    // Additional error case tests
+    #[test]
+    fn test_operator_to_instruction_wrong_operator_type() {
+        let op = Operator {
+            opcode: Some(OpCode::Block as i32),
+            operator: Some(operator::Operator::RelativeDepth(5)), // Wrong type
+        };
+        assert!(wasm_encoder::Instruction::try_from(op).is_err());
+    }
+
+    #[test]
+    fn test_operator_to_instruction_missing_memarg() {
+        let op = Operator {
+            opcode: Some(OpCode::I32Load as i32),
+            ..Operator::default() // Missing MemArg
+        };
+        assert!(wasm_encoder::Instruction::try_from(op).is_err());
+    }
+
+    #[test]
+    fn test_operator_to_instruction_missing_call_indirect_fields() {
+        let ci = CallIndirectOp {
+            type_index: None, // Missing
+            table_index: Some(0),
+        };
+        let op = Operator {
+            opcode: Some(OpCode::CallIndirect as i32),
+            operator: Some(operator::Operator::CallInderect(ci)),
+        };
+        assert!(wasm_encoder::Instruction::try_from(op).is_err());
+    }
+
+    #[test]
+    fn test_operator_to_instruction_invalid_opcode() {
+        let op = Operator {
+            opcode: Some(9999), // Invalid opcode
+            ..Operator::default()
+        };
+        assert!(wasm_encoder::Instruction::try_from(op).is_err());
+    }
+
+    // Round-trip tests for additional operators
+    #[test]
+    fn test_operator_roundtrip_loop() {
+        let original = wasmparser::Operator::Loop {
+            blockty: wasmparser::BlockType::Type(wasmparser::ValType::F32),
+        };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::Loop(blockty) => match blockty {
+                wasm_encoder::BlockType::Result(valtype) => {
+                    assert!(matches!(valtype, wasm_encoder::ValType::F32));
+                }
+                _ => panic!("Expected Result block type"),
+            },
+            _ => panic!("Expected Loop instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_roundtrip_if() {
+        let original = wasmparser::Operator::If {
+            blockty: wasmparser::BlockType::Empty,
+        };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::If(blockty) => {
+                assert!(matches!(blockty, wasm_encoder::BlockType::Empty));
+            }
+            _ => panic!("Expected If instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_roundtrip_brif() {
+        let original = wasmparser::Operator::BrIf { relative_depth: 2 };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::BrIf(depth) => assert_eq!(depth, 2),
+            _ => panic!("Expected BrIf instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_roundtrip_local_get() {
+        let original = wasmparser::Operator::LocalGet { local_index: 10 };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::LocalGet(idx) => assert_eq!(idx, 10),
+            _ => panic!("Expected LocalGet instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_roundtrip_global_get() {
+        let original = wasmparser::Operator::GlobalGet { global_index: 5 };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::GlobalGet(idx) => assert_eq!(idx, 5),
+            _ => panic!("Expected GlobalGet instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_roundtrip_i64_const() {
+        let original = wasmparser::Operator::I64Const { value: -999 };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::I64Const(val) => assert_eq!(val, -999),
+            _ => panic!("Expected I64Const instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_roundtrip_memory_size() {
+        let original = wasmparser::Operator::MemorySize { mem: 0 };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::MemorySize(mem) => assert_eq!(mem, 0),
+            _ => panic!("Expected MemorySize instruction"),
+        }
+    }
 }
