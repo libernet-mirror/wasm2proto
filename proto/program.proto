@@ -1,9 +1,12 @@
 //
-// WebAssembly v1 support
+// Protocol for serializing WebAssembly into Libernet format
 //
-// Limitations:
-// - Reference types and recursive types are not supported
-// - WebAssembly Component Model is not supported
+// Libernet support WebAssembly MVP and following extensions:
+// - sign_extension
+// - saturating_float_to_int
+// - bulk_memory
+// - exceptions
+// - legacy_exceptions
 //
 // Supported sections:
 //
@@ -243,6 +246,19 @@ message DataSection {
   repeated Data datas = 1;
 }
 
+enum TagKind {
+  TkException = 1;
+}
+
+message TagType  {
+  optional TagKind kind = 1;
+  optional uint32 func_type_idx = 2;
+}
+
+message TagSection {
+  repeated TagType tags = 1;
+}
+
 message Section {
   oneof section {
     TypeSection type_section = 1;
@@ -255,6 +271,7 @@ message Section {
     ElementSection element_section = 8;
     CodeSectionEntry code_section_entry = 9;
     DataSection data_section = 10;
+    TagSection tag_section = 11;
   }
 }
 

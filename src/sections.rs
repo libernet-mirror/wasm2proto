@@ -30,9 +30,11 @@ impl Section {
                     MemorySection::from_wasmparser(section)?,
                 )),
             })),
-            Payload::TagSection(_) => {
-                bail!("TagSection is not supported");
-            }
+            Payload::TagSection(section) => Ok(Some(Section {
+                section: Some(section::Section::TagSection(
+                    TagSection::from_wasmparser(section)?,
+                )),
+            })),
             Payload::GlobalSection(section) => Ok(Some(Section {
                 section: Some(section::Section::GlobalSection(
                     GlobalSection::from_wasmparser(section)?,
@@ -115,6 +117,9 @@ impl Section {
             }
             Some(section::Section::CodeSectionEntry(code_section_entry)) => {
                 code_section_entry.render_wasm(code_section)
+            }
+            Some(section::Section::TagSection(tag_section)) => {
+                tag_section.render_wasm(module)
             }
             Some(section::Section::DataSection(data_section)) => data_section.render_wasm(module),
             _ => bail!("render_wasm: is not supported for section {:?}", self),
@@ -610,4 +615,33 @@ impl DataSection {
         module.section(&section);
         Ok(())
     }
+}
+
+impl TagSection {
+  fn from_wasmparser(section: wasmparser::SectionLimited<'_, wasmparser::TagType>) -> Result<TagSection> {
+    let mut tags: Vec<TagType> = Vec::new();
+    for tag in section {
+      let tag = tag?;
+      if tag.kind != wasmparser::TagKind::Exception {
+        bail!("Only Exception tags are supported");
+      }
+      tags.push(TagType {
+        kind: Some(TagKind::TkException as i32),
+        func_type_idx: Some(tag.func_type_idx),
+      });
+    }
+    Ok(TagSection { tags })
+  }
+  fn render_wasm(&self, module: &mut wasm_encoder::Module) -> Result<()> {
+    use wasm_encoder::{ TagSection, TagType, TagKind };
+    let mut tags = TagSection::new();
+    for tag in &self.tags {
+      tags.tag(TagType {
+        kind: TagKind::Exception,
+        func_type_idx: tag.func_type_idx.ok_or(anyhow!("Func type index not found"))?,
+      });
+    }
+    module.section(&tags);
+    Ok(())
+  }
 }

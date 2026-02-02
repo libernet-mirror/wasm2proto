@@ -71,6 +71,33 @@ impl TryFrom<MemArg> for wasm_encoder::MemArg {
     }
 }
 
+impl TryFrom<wasmparser::Catch> for CatchElement {
+    type Error = anyhow::Error;
+
+    fn try_from(catch: wasmparser::Catch) -> Result<Self> {
+        match catch {
+            wasmparser::Catch::One { tag, label } => Ok(CatchElement {
+                catch: Some(catch_element::Catch::One(CatchOne {
+                    tag: Some(tag),
+                    label: Some(label),
+                })),
+            }),
+            wasmparser::Catch::OneRef { tag, label } => Ok(CatchElement {
+                catch: Some(catch_element::Catch::OneRef(CatchOneRef {
+                    tag: Some(tag),
+                    label: Some(label),
+                })),
+            }),
+            wasmparser::Catch::All { label } => Ok(CatchElement {
+                catch: Some(catch_element::Catch::All(CatchAllEl { label: Some(label) })),
+            }),
+            wasmparser::Catch::AllRef { label } => Ok(CatchElement {
+                catch: Some(catch_element::Catch::AllRef(CatchAllRef { label: Some(label) })),
+            }),
+        }
+    }
+}
+
 impl TryFrom<wasmparser::Operator<'_>> for Operator {
     type Error = anyhow::Error;
 
@@ -881,7 +908,51 @@ impl TryFrom<wasmparser::Operator<'_>> for Operator {
                     src_table: Some(src_table),
                 })),
             }),
-
+            // @exceptions
+            wasmparser::Operator::TryTable { try_table } => {
+                let mut catches: Vec<CatchElement> = Vec::new();
+                for catch in try_table.catches {
+                    catches.push(CatchElement::try_from(catch)?);
+                }
+                Ok(Operator {
+                    opcode: Some(OpCode::TryTable as i32),
+                    operator: Some(operator::Operator::TryTable(TryTableOp {
+                        ty: Some(BlockType::try_from(try_table.ty)?),
+                        catches,
+                    })),
+                })
+            }
+            wasmparser::Operator::Throw { tag_index } => Ok(Operator {
+                opcode: Some(OpCode::Throw as i32),
+                operator: Some(operator::Operator::Throw(ThrowOp {
+                    tag_index: Some(tag_index),
+                })),
+            }),
+            wasmparser::Operator::ThrowRef {} => Ok(Operator {
+                opcode: Some(OpCode::ThrowRef as i32),
+                ..Operator::default()
+            }),
+            // @legacy_exceptions
+            wasmparser::Operator::Try { blockty } => Ok(Operator {
+                opcode: Some(OpCode::Try as i32),
+                operator: Some(operator::Operator::Blockty(BlockType::try_from(blockty)?)),
+            }),
+            wasmparser::Operator::Catch { tag_index } => Ok(Operator {
+                opcode: Some(OpCode::Catch as i32),
+                operator: Some(operator::Operator::TagIndex(tag_index)),
+            }),
+            wasmparser::Operator::Rethrow { relative_depth } => Ok(Operator {
+                opcode: Some(OpCode::Rethrow as i32),
+                operator: Some(operator::Operator::RelativeDepth(relative_depth)),
+            }),
+            wasmparser::Operator::Delegate { relative_depth } => Ok(Operator {
+                opcode: Some(OpCode::Delegate as i32),
+                operator: Some(operator::Operator::RelativeDepth(relative_depth)),
+            }),
+            wasmparser::Operator::CatchAll {} => Ok(Operator {
+                opcode: Some(OpCode::CatchAll as i32),
+                ..Operator::default()
+            }),
             _ => Err(anyhow!("Got unsupported operator: {:?}", operator)),
         }
     }
@@ -1568,6 +1639,76 @@ impl TryFrom<Operator> for wasm_encoder::Instruction<'_> {
                     src_table,
                 })
             }
+            OpCode::TryTable => {
+                let ty = match operator
+                    .operator
+                    .ok_or(anyhow!("TryTable operator not found"))?
+                {
+                    operator::Operator::TryTable(tt) => {
+                        tt.ty.ok_or(anyhow!("TryTable ty not found"))?
+                    }
+                    _ => return Err(anyhow!("Expected TryTableOp for TryTable operator")),
+                };
+                let catches: Vec<wasm_encoder::Catch> = Vec::new();
+                Ok(wasm_encoder::Instruction::TryTable(
+                    wasm_encoder::BlockType::try_from(ty)?,
+                    catches.into(),
+                ))
+            }
+            OpCode::Throw => {
+                let tag_index = match operator
+                    .operator
+                    .ok_or(anyhow!("Throw operator not found"))?
+                {
+                    operator::Operator::Throw(to) => {
+                        to.tag_index.ok_or(anyhow!("Throw tag_index not found"))?
+                    }
+                    _ => return Err(anyhow!("Expected ThrowOp for Throw operator")),
+                };
+                Ok(wasm_encoder::Instruction::Throw(tag_index))
+            }
+            OpCode::ThrowRef => Ok(wasm_encoder::Instruction::ThrowRef),
+            OpCode::Try => {
+                let ty = match operator
+                    .operator
+                    .ok_or(anyhow!("Try operator not found"))?
+                {
+                    operator::Operator::Blockty(bt) => wasm_encoder::BlockType::try_from(bt)?,
+                    _ => return Err(anyhow!("Expected BlockType for Try operator")),
+                };
+                Ok(wasm_encoder::Instruction::Try(ty))
+            }
+            OpCode::Catch => {
+                let tag_index = match operator
+                    .operator
+                    .ok_or(anyhow!("Catch operator not found"))?
+                {
+                    operator::Operator::TagIndex(idx) => idx,
+                    _ => return Err(anyhow!("Expected TagIndex for Catch operator")),
+                };
+                Ok(wasm_encoder::Instruction::Catch(tag_index))
+            }
+            OpCode::Rethrow => {
+                let relative_depth = match operator
+                    .operator
+                    .ok_or(anyhow!("Rethrow operator not found"))?
+                {
+                    operator::Operator::RelativeDepth(idx) => idx,
+                    _ => return Err(anyhow!("Expected RelativeDepth for Rethrow operator")),
+                };
+                Ok(wasm_encoder::Instruction::Rethrow(relative_depth))
+            }
+            OpCode::Delegate => {
+                let relative_depth = match operator
+                    .operator
+                    .ok_or(anyhow!("Delegate operator not found"))?
+                {
+                    operator::Operator::RelativeDepth(idx) => idx,
+                    _ => return Err(anyhow!("Expected RelativeDepth for Delegate operator")),
+                };
+                Ok(wasm_encoder::Instruction::Delegate(relative_depth))
+            }
+            OpCode::CatchAll => Ok(wasm_encoder::Instruction::CatchAll),
         }
     }
 }
@@ -1873,8 +2014,6 @@ mod tests {
                         match result.operator {
                             Some(operator::Operator::Targets(targets_proto)) => {
                                 assert_eq!(targets_proto.default, Some(0));
-                                // We can't easily recreate the targets iterator, so just check default
-                                assert!(targets_proto.targets.len() >= 0);
                             }
                             _ => panic!("Expected Targets"),
                         }
