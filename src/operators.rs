@@ -11,7 +11,7 @@ impl TryFrom<wasmparser::BlockType> for BlockType {
             }),
             wasmparser::BlockType::Type(valtype) => Ok(BlockType {
                 blockty: Some(block_type::Blockty::ValueType(
-                    ValueType::try_from(valtype)? as i32,
+                    ValueType::try_from(valtype)?,
                 )),
             }),
             wasmparser::BlockType::FuncType(funcidx) => Ok(BlockType {
@@ -1734,7 +1734,7 @@ mod tests {
         let result = BlockType::try_from(blockty).unwrap();
         match result.blockty {
             Some(block_type::Blockty::ValueType(valtype)) => {
-                assert_eq!(valtype, ValueType::I32 as i32);
+                assert_eq!(valtype, ValueType { val_type: Some(EValueType::I32 as i32), ref_type: None });
             }
             _ => panic!("Expected ValueType variant"),
         }
@@ -1764,7 +1764,7 @@ mod tests {
     #[test]
     fn test_blocktype_to_wasm_encoder_type() {
         let blocktype = BlockType {
-            blockty: Some(block_type::Blockty::ValueType(ValueType::I32 as i32)),
+            blockty: Some(block_type::Blockty::ValueType(ValueType { val_type: Some(EValueType::I32 as i32), ref_type: None })),
         };
         let result = wasm_encoder::BlockType::try_from(blocktype).unwrap();
         match result {

@@ -17,57 +17,9 @@
 //   - Only single imports are supported
 //   - Only function imports are supported
 //
-// FunctionSection
-//
 // TableSection
 //   - Table initialization is not supported
 //   - Only funcref tables are supported
-//
-// MemorySection
-//
-// ExportSection
-//
-// ElementSection
-//
-// CodeSection
-//   - Function locals are stored in the protocol
-//   - Function bodies are preserved as raw bytes
-//
-// DataSection
-//
-// Unsupported sections:
-//
-// TagSection                     (exceptions)
-// StartSection
-// InstanceSection
-// CoreTypeSection
-// ComponentInstanceSection
-// ComponentAliasSection
-// ComponentTypeSection
-// ComponentCanonicalSection
-// ComponentStartSection
-// ComponentImportSection
-// ComponentExportSection
-// CustomSection
-//
-// Known limitations / areas for improvement:
-//
-// - CodeSection is represented as individual entries rather than a single
-//   aggregated section, which requires strict ordering guarantees during
-//   encoding and decoding.
-//
-// - ElementKind and DataKind allow structurally invalid combinations
-//   (e.g. missing offsets for active segments) and would benefit from
-//   stricter modeling.
-//
-// - Advanced WebAssembly v1 features such as shared memories, memory64,
-//   table64, and custom page sizes are not fully validated and should be
-//   treated as unsupported unless explicitly handled.
-//
-// - The protocol currently allows multiple core sections of the same kind
-//   to appear; additional validation is required to enforce canonical
-//   WebAssembly section ordering and uniqueness.
-//
 
 syntax = "proto2";
 
@@ -116,12 +68,6 @@ message Expression {
   repeated Operator operators = 1;
 }
 
-message RefType {
-  required bool shared = 1;
-  required bool nullable = 2;
-  required AbstractRefType ty = 3;
-}
-
 message Version {
   required uint32 num = 1;
   required Encoding encoding = 2;
@@ -161,7 +107,7 @@ message TableSection {
 }
 
 message TableType {
-  required RefType ref_type = 1;
+  required ERefType ref_type = 1;
   required bool table64 = 2;
   required uint64 initial = 3;
   optional uint64 maximum = 4;
@@ -214,7 +160,7 @@ message ElementFunctions {
 }
 
 message ElementExpressions {
-  required RefType ref_type = 1;
+  required ERefType ref_type = 1;
   repeated Expression expressions = 2;
 }
 

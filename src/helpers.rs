@@ -2,18 +2,61 @@ use anyhow::{Ok, Result, anyhow, bail};
 
 use crate::program::*;
 
+impl TryFrom<wasmparser::RefType> for ERefType {
+    type Error = anyhow::Error;
+
+    fn try_from(ref_type: wasmparser::RefType) -> Result<Self> {
+        use wasmparser::{AbstractHeapType, HeapType};
+        match ref_type.heap_type() {
+            HeapType::Abstract {
+                shared: false,
+                ty: AbstractHeapType::Func,
+            } => Ok(ERefType::RefFunc),
+            _ => {
+                bail!("Only reffunc elements are supported");
+            }
+        }
+    }
+}
+
+impl TryFrom<ERefType> for wasm_encoder::RefType {
+    type Error = anyhow::Error;
+
+    fn try_from(_ref_type: ERefType) -> Result<Self> {
+        Ok(wasm_encoder::RefType::FUNCREF)
+    }
+}
+
 impl TryFrom<wasmparser::ValType> for ValueType {
     type Error = anyhow::Error;
 
     fn try_from(val_type: wasmparser::ValType) -> Result<Self> {
         use wasmparser::ValType;
         match val_type {
-            ValType::I32 => Ok(ValueType::I32),
-            ValType::I64 => Ok(ValueType::I64),
-            ValType::F32 => Ok(ValueType::F32),
-            ValType::F64 => Ok(ValueType::F64),
-            ValType::V128 => Ok(ValueType::V128),
-            ValType::Ref(_) => Err(anyhow!("Ref types are not supported")),
+            ValType::I32 => Ok(ValueType {
+                val_type: Some(EValueType::I32 as i32),
+                ref_type: None,
+            }),
+            ValType::I64 => Ok(ValueType {
+                val_type: Some(EValueType::I64 as i32),
+                ref_type: None,
+            }),
+            ValType::F32 => Ok(ValueType {
+                val_type: Some(EValueType::F32 as i32),
+                ref_type: None,
+            }),
+            ValType::F64 => Ok(ValueType {
+                val_type: Some(EValueType::F64 as i32),
+                ref_type: None,
+            }),
+            ValType::V128 => Ok(ValueType {
+                val_type: Some(EValueType::V128 as i32),
+                ref_type: None,
+            }),
+            ValType::Ref(ref_type) => Ok(ValueType {
+                val_type: Some(EValueType::Ref as i32),
+                ref_type: Some(ERefType::try_from(ref_type)? as i32),
+            }),
         }
     }
 }
@@ -22,12 +65,17 @@ impl TryFrom<ValueType> for wasm_encoder::ValType {
     type Error = anyhow::Error;
 
     fn try_from(value_type: ValueType) -> Result<Self> {
-        match value_type {
-            ValueType::I32 => Ok(wasm_encoder::ValType::I32),
-            ValueType::I64 => Ok(wasm_encoder::ValType::I64),
-            ValueType::F32 => Ok(wasm_encoder::ValType::F32),
-            ValueType::F64 => Ok(wasm_encoder::ValType::F64),
-            ValueType::V128 => Ok(wasm_encoder::ValType::V128),
+        let ty: EValueType = value_type
+            .val_type
+            .ok_or(anyhow!("Value type not found"))?
+            .try_into()?;
+        match ty {
+            EValueType::I32 => Ok(wasm_encoder::ValType::I32),
+            EValueType::I64 => Ok(wasm_encoder::ValType::I64),
+            EValueType::F32 => Ok(wasm_encoder::ValType::F32),
+            EValueType::F64 => Ok(wasm_encoder::ValType::F64),
+            EValueType::V128 => Ok(wasm_encoder::ValType::V128),
+            EValueType::Ref => Ok(wasm_encoder::ValType::Ref(ERefType::try_from(value_type.ref_type.ok_or(anyhow!("Ref type not found"))?)?.try_into()?)),
         }
     }
 }
@@ -143,46 +191,6 @@ impl TryFrom<wasmparser::DataKind<'_>> for DataKind {
     }
 }
 
-impl TryFrom<wasmparser::RefType> for RefType {
-    type Error = anyhow::Error;
-
-    fn try_from(ref_type: wasmparser::RefType) -> Result<Self> {
-        use wasmparser::{AbstractHeapType, HeapType};
-        match ref_type.heap_type() {
-            HeapType::Abstract {
-                shared: false,
-                ty: AbstractHeapType::Func,
-            } => {
-                // Ok
-            }
-            _ => {
-                bail!("Only funcref elements are supported");
-            }
-        };
-
-        Ok(RefType {
-            shared: false,
-            nullable: ref_type.is_nullable(),
-            ty: AbstractRefType::RefFunc as i32,
-        })
-    }
-}
-
-impl TryFrom<RefType> for wasm_encoder::RefType {
-    type Error = anyhow::Error;
-
-    fn try_from(ref_type: RefType) -> Result<Self> {
-        use wasm_encoder::{AbstractHeapType, HeapType};
-        Ok(wasm_encoder::RefType {
-            nullable: ref_type.nullable,
-            heap_type: HeapType::Abstract {
-                shared: ref_type.shared,
-                ty: AbstractHeapType::Func,
-            },
-        })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -191,85 +199,57 @@ mod tests {
     fn test_valtype_from_wasmparser() {
         use wasmparser::ValType;
 
-        // Test all supported value types
         assert!(matches!(
             ValueType::try_from(ValType::I32).unwrap(),
-            ValueType::I32
+            ValueType { val_type: Some(1), ref_type: None }
         ));
         assert!(matches!(
             ValueType::try_from(ValType::I64).unwrap(),
-            ValueType::I64
+            ValueType { val_type: Some(2), ref_type: None }
         ));
         assert!(matches!(
             ValueType::try_from(ValType::F32).unwrap(),
-            ValueType::F32
+            ValueType { val_type: Some(3), ref_type: None }
         ));
         assert!(matches!(
             ValueType::try_from(ValType::F64).unwrap(),
-            ValueType::F64
+            ValueType { val_type: Some(4), ref_type: None }
         ));
         assert!(matches!(
             ValueType::try_from(ValType::V128).unwrap(),
-            ValueType::V128
+            ValueType { val_type: Some(5), ref_type: None }
         ));
-
-        // Test unsupported Ref type - create a funcref type
-        // We need to parse a WASM module with a ref type to get a proper RefType
-        let mut module = wasm_encoder::Module::new();
-        let mut table_section = wasm_encoder::TableSection::new();
-        table_section.table(wasm_encoder::TableType {
-            element_type: wasm_encoder::RefType::FUNCREF,
-            minimum: 0,
-            maximum: None,
-            shared: false,
-            table64: false,
-        });
-        module.section(&table_section);
-        let wasm_bytes = module.finish();
-
-        // Parse to get the RefType
-        let parser = wasmparser::Parser::new(0);
-        for payload in parser.parse_all(&wasm_bytes) {
-            let payload = payload.unwrap();
-            if let wasmparser::Payload::TableSection(section) = payload {
-                for table_result in section {
-                    match table_result {
-                        std::result::Result::Ok(table) => {
-                            // Try to convert the ref type to ValueType - should fail
-                            let element_type = table.ty.element_type;
-                            let ref_val_type = ValType::Ref(element_type);
-                            let result = ValueType::try_from(ref_val_type);
-                            assert!(result.is_err());
-                            break;
-                        }
-                        std::result::Result::Err(_) => continue,
-                    }
-                }
-            }
-        }
+        assert!(matches!(
+            ValueType::try_from(ValType::Ref(wasmparser::RefType::FUNCREF)).unwrap(),
+            ValueType { val_type: Some(6), ref_type: Some(1) }
+        ));
     }
 
     #[test]
     fn test_valtype_to_wasm_encoder() {
         assert!(matches!(
-            wasm_encoder::ValType::try_from(ValueType::I32).unwrap(),
+            wasm_encoder::ValType::try_from(ValueType { val_type: Some(EValueType::I32 as i32), ref_type: None }).unwrap(),
             wasm_encoder::ValType::I32
         ));
         assert!(matches!(
-            wasm_encoder::ValType::try_from(ValueType::I64).unwrap(),
+            wasm_encoder::ValType::try_from(ValueType { val_type: Some(EValueType::I64 as i32), ref_type: None }).unwrap(),
             wasm_encoder::ValType::I64
         ));
         assert!(matches!(
-            wasm_encoder::ValType::try_from(ValueType::F32).unwrap(),
+            wasm_encoder::ValType::try_from(ValueType { val_type: Some(EValueType::F32 as i32), ref_type: None }).unwrap(),
             wasm_encoder::ValType::F32
         ));
         assert!(matches!(
-            wasm_encoder::ValType::try_from(ValueType::F64).unwrap(),
+            wasm_encoder::ValType::try_from(ValueType { val_type: Some(EValueType::F64 as i32), ref_type: None }).unwrap(),
             wasm_encoder::ValType::F64
         ));
         assert!(matches!(
-            wasm_encoder::ValType::try_from(ValueType::V128).unwrap(),
+            wasm_encoder::ValType::try_from(ValueType { val_type: Some(EValueType::V128 as i32), ref_type: None }).unwrap(),
             wasm_encoder::ValType::V128
+        ));
+        assert!(matches!(
+            wasm_encoder::ValType::try_from(ValueType { val_type: Some(EValueType::Ref as i32), ref_type: Some(ERefType::RefFunc as i32) }).unwrap(),
+            wasm_encoder::ValType::Ref(wasm_encoder::RefType::FUNCREF)
         ));
     }
 
@@ -324,107 +304,4 @@ mod tests {
         assert!(wasm_encoder::ExportKind::try_from(ExternalKind::ExtFuncExact).is_err());
     }
 
-    #[test]
-    fn test_ref_type_from_wasmparser() {
-        // Create a WASM module with a funcref table to get a proper RefType
-        let mut module = wasm_encoder::Module::new();
-        let mut table_section = wasm_encoder::TableSection::new();
-        table_section.table(wasm_encoder::TableType {
-            element_type: wasm_encoder::RefType::FUNCREF,
-            minimum: 0,
-            maximum: None,
-            shared: false,
-            table64: false,
-        });
-        module.section(&table_section);
-        let wasm_bytes = module.finish();
-
-        // Parse to get the RefType
-        let parser = wasmparser::Parser::new(0);
-        for payload in parser.parse_all(&wasm_bytes) {
-            let payload = payload.unwrap();
-            if let wasmparser::Payload::TableSection(section) = payload {
-                for table_result in section {
-                    match table_result {
-                        std::result::Result::Ok(table) => {
-                            // Test valid funcref (non-shared, nullable)
-                            let ref_type = table.ty.element_type;
-                            let is_nullable = ref_type.is_nullable();
-                            let result = RefType::try_from(ref_type).unwrap();
-                            assert_eq!(result.shared, false);
-                            assert_eq!(result.nullable, is_nullable);
-                            assert_eq!(result.ty, AbstractRefType::RefFunc as i32);
-                            break;
-                        }
-                        std::result::Result::Err(_) => continue,
-                    }
-                }
-            }
-        }
-
-        // Test invalid: externref - create a module with externref
-        let mut module = wasm_encoder::Module::new();
-        let mut table_section = wasm_encoder::TableSection::new();
-        table_section.table(wasm_encoder::TableType {
-            element_type: wasm_encoder::RefType::EXTERNREF,
-            minimum: 0,
-            maximum: None,
-            shared: false,
-            table64: false,
-        });
-        module.section(&table_section);
-        let wasm_bytes = module.finish();
-
-        let parser = wasmparser::Parser::new(0);
-        for payload in parser.parse_all(&wasm_bytes) {
-            let payload = payload.unwrap();
-            if let wasmparser::Payload::TableSection(section) = payload {
-                for table_result in section {
-                    match table_result {
-                        std::result::Result::Ok(table) => {
-                            // Should fail for externref
-                            let element_type = table.ty.element_type;
-                            let result = RefType::try_from(element_type);
-                            assert!(result.is_err());
-                            break;
-                        }
-                        std::result::Result::Err(_) => continue,
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_ref_type_to_wasm_encoder() {
-        // Test nullable funcref
-        let ref_type = RefType {
-            shared: false,
-            nullable: true,
-            ty: AbstractRefType::RefFunc as i32,
-        };
-        let result = wasm_encoder::RefType::try_from(ref_type).unwrap();
-        assert_eq!(result.nullable, true);
-        if let wasm_encoder::HeapType::Abstract { shared, ty } = result.heap_type {
-            assert_eq!(shared, false);
-            assert!(matches!(ty, wasm_encoder::AbstractHeapType::Func));
-        } else {
-            panic!("Expected Abstract heap type");
-        }
-
-        // Test non-nullable funcref
-        let ref_type = RefType {
-            shared: false,
-            nullable: false,
-            ty: AbstractRefType::RefFunc as i32,
-        };
-        let result = wasm_encoder::RefType::try_from(ref_type).unwrap();
-        assert_eq!(result.nullable, false);
-        if let wasm_encoder::HeapType::Abstract { shared, ty } = result.heap_type {
-            assert_eq!(shared, false);
-            assert!(matches!(ty, wasm_encoder::AbstractHeapType::Func));
-        } else {
-            panic!("Expected Abstract heap type");
-        }
-    }
 }

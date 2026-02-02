@@ -175,13 +175,13 @@ impl TypeSection {
             }
             match &atype.composite_type.inner {
                 CompositeInnerType::Func(ft) => {
-                    let mut params: Vec<i32> = Vec::new();
+                    let mut params: Vec<ValueType> = Vec::new();
                     for param in ft.params() {
-                        params.push(ValueType::try_from(*param)? as i32);
+                        params.push(ValueType::try_from(*param)?);
                     }
-                    let mut results: Vec<i32> = Vec::new();
+                    let mut results: Vec<ValueType> = Vec::new();
                     for result in ft.results() {
-                        results.push(ValueType::try_from(*result)? as i32);
+                        results.push(ValueType::try_from(*result)?);
                     }
                     program_types.push(SubType {
                         kind: Some(sub_type::Kind::Func(FuncType { params, results })),
@@ -317,7 +317,7 @@ impl TableSection {
             }
 
             proto_tables.push(TableType {
-                ref_type: RefType::try_from(table.ty.element_type)?,
+                ref_type: ERefType::try_from(table.ty.element_type)? as i32,
                 table64: table.ty.table64,
                 initial: table.ty.initial,
                 maximum: table.ty.maximum,
@@ -333,8 +333,9 @@ impl TableSection {
         use wasm_encoder::{TableSection, TableType};
         let mut table_types = TableSection::new();
         for ty in &self.types {
+            let ref_type = ERefType::try_from(ty.ref_type)?;
             table_types.table(TableType {
-                element_type: ty.ref_type.try_into()?,
+                element_type: ref_type.try_into()?,
                 table64: ty.table64,
                 minimum: ty.initial,
                 maximum: ty.maximum,
@@ -389,7 +390,7 @@ impl GlobalSection {
             let global = global?;
             globals.push(Global {
                 ty: GlobalType {
-                    content_type: ValueType::try_from(global.ty.content_type)? as i32,
+                    content_type: ValueType::try_from(global.ty.content_type)?,
                     mutable: global.ty.mutable,
                     shared: global.ty.shared,
                 },
@@ -470,7 +471,7 @@ impl ElementSection {
                         expressions.push(Expression::try_from(expression?)?);
                     }
                     element::Items::Expressions(ElementExpressions {
-                        ref_type: RefType::try_from(ref_type)?,
+                        ref_type: ERefType::try_from(ref_type)? as i32,
                         expressions,
                     })
                 }
@@ -516,7 +517,7 @@ impl ElementSection {
                         instructions.push(ConstExpr::try_from(expression.clone())?);
                     }
                     Elements::Expressions(
-                        RefType::try_from(expressions.ref_type)?,
+                        RefType::try_from(ERefType::try_from(expressions.ref_type)?)?,
                         instructions.into(),
                     )
                 }
@@ -539,7 +540,7 @@ impl CodeSectionEntry {
 
             locals.push(Locals {
                 count,
-                value_type: ValueType::try_from(val_type)? as i32,
+                value_type: ValueType::try_from(val_type)?,
             });
         }
         let mut operators: Vec<Operator> = Vec::new();
