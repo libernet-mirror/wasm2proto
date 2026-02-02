@@ -11,14 +11,21 @@
 // Limitations:
 //
 // TypeSection
-//   - Only `externref` and `funcref` are supported (covers 100% of MVP + listed extensions)
+//   - Only `externref` and `funcref` are supported (covers 100% of the MVP and listed extensions)
 //
 // ImportSection
 //   - Only single imports are supported
 //   - Only function imports are supported
 //
+//     @caiiiycuk: This should be fine for the Libernet use case; there is no need to import
+//     memory or tables from the host.
+//
 // TableSection
 //   - Table initialization is not supported
+//
+//     @caiiiycuk: This may potentially break the `bulk_memory` extension,
+//     but it has never been observed in real-world modules and can be added if needed.
+//
 
 
 syntax = "proto2";
