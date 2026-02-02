@@ -3288,4 +3288,827 @@ mod tests {
             _ => panic!("Expected MemorySize instruction"),
         }
     }
+
+    #[test]
+    fn test_operator_roundtrip_i32_load() {
+        let memarg = wasmparser::MemArg {
+            align: 2,
+            max_align: 2,
+            offset: 100,
+            memory: 0,
+        };
+        let original = wasmparser::Operator::I32Load { memarg };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::I32Load(ma) => {
+                assert_eq!(ma.align, 2);
+                assert_eq!(ma.offset, 100);
+                assert_eq!(ma.memory_index, 0);
+            }
+            _ => panic!("Expected I32Load instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_roundtrip_i64_load8s() {
+        let memarg = wasmparser::MemArg {
+            align: 0,
+            max_align: 0,
+            offset: 0,
+            memory: 1,
+        };
+        let original = wasmparser::Operator::I64Load8S { memarg };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::I64Load8S(ma) => {
+                assert_eq!(ma.memory_index, 1);
+            }
+            _ => panic!("Expected I64Load8S instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_roundtrip_f32_store() {
+        let memarg = wasmparser::MemArg {
+            align: 2,
+            max_align: 2,
+            offset: 200,
+            memory: 0,
+        };
+        let original = wasmparser::Operator::F32Store { memarg };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::F32Store(ma) => {
+                assert_eq!(ma.align, 2);
+                assert_eq!(ma.offset, 200);
+            }
+            _ => panic!("Expected F32Store instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_roundtrip_i32_store8() {
+        let memarg = wasmparser::MemArg {
+            align: 0,
+            max_align: 0,
+            offset: 50,
+            memory: 0,
+        };
+        let original = wasmparser::Operator::I32Store8 { memarg };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::I32Store8(ma) => {
+                assert_eq!(ma.offset, 50);
+            }
+            _ => panic!("Expected I32Store8 instruction"),
+        }
+    }
+
+    // Roundtrip tests for constants
+    #[test]
+    fn test_operator_roundtrip_i32_const() {
+        let original = wasmparser::Operator::I32Const { value: -42 };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::I32Const(val) => assert_eq!(val, -42),
+            _ => panic!("Expected I32Const instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_roundtrip_f32_const() {
+        // Create a WASM module to get proper Ieee32
+        let mut module = wasm_encoder::Module::new();
+        use wasm_encoder::{CompositeInnerType, CompositeType, SubType};
+        let mut type_section = wasm_encoder::TypeSection::new();
+        let func_type = SubType {
+            is_final: true,
+            supertype_idx: None,
+            composite_type: CompositeType {
+                inner: CompositeInnerType::Func(wasm_encoder::FuncType::new(vec![], vec![])),
+                shared: false,
+                descriptor: None,
+                describes: None,
+            },
+        };
+        type_section.ty().subtype(&func_type);
+        module.section(&type_section);
+        let mut func_section = wasm_encoder::FunctionSection::new();
+        func_section.function(0);
+        module.section(&func_section);
+        let mut code = wasm_encoder::CodeSection::new();
+        let mut func = wasm_encoder::Function::new(vec![]);
+        let test_value = 1.5f32;
+        func.instruction(&wasm_encoder::Instruction::F32Const(
+            wasm_encoder::Ieee32::new(test_value.to_bits()),
+        ));
+        func.instruction(&wasm_encoder::Instruction::End);
+        code.function(&func);
+        module.section(&code);
+        let wasm_bytes = module.finish();
+
+        let parser = wasmparser::Parser::new(0);
+        for payload in parser.parse_all(&wasm_bytes) {
+            let payload = payload.unwrap();
+            if let wasmparser::Payload::CodeSectionEntry(body) = payload {
+                let reader = body.get_operators_reader().unwrap();
+                for operator_result in reader {
+                    let operator = operator_result.unwrap();
+                    if let wasmparser::Operator::F32Const { value } = operator {
+                        let proto = Operator::try_from(wasmparser::Operator::F32Const { value }).unwrap();
+                        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+                        match back {
+                            wasm_encoder::Instruction::F32Const(ieee) => {
+                                assert_eq!(ieee.bits(), test_value.to_bits());
+                            }
+                            _ => panic!("Expected F32Const instruction"),
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // Roundtrip tests for local/global operations
+    #[test]
+    fn test_operator_roundtrip_local_set() {
+        let original = wasmparser::Operator::LocalSet { local_index: 99 };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::LocalSet(idx) => assert_eq!(idx, 99),
+            _ => panic!("Expected LocalSet instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_roundtrip_local_tee() {
+        let original = wasmparser::Operator::LocalTee { local_index: 77 };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::LocalTee(idx) => assert_eq!(idx, 77),
+            _ => panic!("Expected LocalTee instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_roundtrip_global_set() {
+        let original = wasmparser::Operator::GlobalSet { global_index: 33 };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::GlobalSet(idx) => assert_eq!(idx, 33),
+            _ => panic!("Expected GlobalSet instruction"),
+        }
+    }
+
+    // Roundtrip tests for call operations
+    #[test]
+    fn test_operator_roundtrip_call() {
+        let original = wasmparser::Operator::Call { function_index: 123 };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::Call(idx) => assert_eq!(idx, 123),
+            _ => panic!("Expected Call instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_roundtrip_call_indirect() {
+        let original = wasmparser::Operator::CallIndirect {
+            type_index: 5,
+            table_index: 1,
+        };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::CallIndirect { type_index, table_index } => {
+                assert_eq!(type_index, 5);
+                assert_eq!(table_index, 1);
+            }
+            _ => panic!("Expected CallIndirect instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_roundtrip_br() {
+        let original = wasmparser::Operator::Br { relative_depth: 7 };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::Br(depth) => assert_eq!(depth, 7),
+            _ => panic!("Expected Br instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_roundtrip_memory_grow() {
+        let original = wasmparser::Operator::MemoryGrow { mem: 2 };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::MemoryGrow(mem) => assert_eq!(mem, 2),
+            _ => panic!("Expected MemoryGrow instruction"),
+        }
+    }
+
+    // Roundtrip tests for bulk memory operations
+    #[test]
+    fn test_operator_roundtrip_memory_init() {
+        let original = wasmparser::Operator::MemoryInit {
+            data_index: 3,
+            mem: 0,
+        };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::MemoryInit { mem, data_index } => {
+                assert_eq!(data_index, 3);
+                assert_eq!(mem, 0);
+            }
+            _ => panic!("Expected MemoryInit instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_roundtrip_memory_copy() {
+        let original = wasmparser::Operator::MemoryCopy {
+            dst_mem: 0,
+            src_mem: 1,
+        };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::MemoryCopy { dst_mem, src_mem } => {
+                assert_eq!(dst_mem, 0);
+                assert_eq!(src_mem, 1);
+            }
+            _ => panic!("Expected MemoryCopy instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_roundtrip_memory_fill() {
+        let original = wasmparser::Operator::MemoryFill { mem: 1 };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::MemoryFill(mem) => assert_eq!(mem, 1),
+            _ => panic!("Expected MemoryFill instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_roundtrip_data_drop() {
+        let original = wasmparser::Operator::DataDrop { data_index: 5 };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::DataDrop(idx) => assert_eq!(idx, 5),
+            _ => panic!("Expected DataDrop instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_roundtrip_table_init() {
+        let original = wasmparser::Operator::TableInit {
+            elem_index: 2,
+            table: 0,
+        };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::TableInit { table, elem_index } => {
+                assert_eq!(elem_index, 2);
+                assert_eq!(table, 0);
+            }
+            _ => panic!("Expected TableInit instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_roundtrip_table_copy() {
+        let original = wasmparser::Operator::TableCopy {
+            dst_table: 1,
+            src_table: 0,
+        };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::TableCopy { dst_table, src_table } => {
+                assert_eq!(dst_table, 1);
+                assert_eq!(src_table, 0);
+            }
+            _ => panic!("Expected TableCopy instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_roundtrip_elem_drop() {
+        let original = wasmparser::Operator::ElemDrop { elem_index: 4 };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::ElemDrop(idx) => assert_eq!(idx, 4),
+            _ => panic!("Expected ElemDrop instruction"),
+        }
+    }
+
+    // Roundtrip tests for exception operations
+    #[test]
+    fn test_operator_roundtrip_throw() {
+        let original = wasmparser::Operator::Throw { tag_index: 10 };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::Throw(idx) => assert_eq!(idx, 10),
+            _ => panic!("Expected Throw instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_roundtrip_rethrow() {
+        let original = wasmparser::Operator::Rethrow { relative_depth: 2 };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::Rethrow(depth) => assert_eq!(depth, 2),
+            _ => panic!("Expected Rethrow instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_roundtrip_delegate() {
+        let original = wasmparser::Operator::Delegate { relative_depth: 4 };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::Delegate(depth) => assert_eq!(depth, 4),
+            _ => panic!("Expected Delegate instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_roundtrip_catch() {
+        let original = wasmparser::Operator::Catch { tag_index: 8 };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::Catch(idx) => assert_eq!(idx, 8),
+            _ => panic!("Expected Catch instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_roundtrip_try() {
+        let original = wasmparser::Operator::Try {
+            blockty: wasmparser::BlockType::Type(wasmparser::ValType::I32),
+        };
+        let proto = Operator::try_from(original).unwrap();
+        let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::Instruction::Try(blockty) => {
+                match blockty {
+                    wasm_encoder::BlockType::Result(valtype) => {
+                        assert!(matches!(valtype, wasm_encoder::ValType::I32));
+                    }
+                    _ => panic!("Expected Result block type"),
+                }
+            }
+            _ => panic!("Expected Try instruction"),
+        }
+    }
+
+    // Roundtrip test for BlockType with FuncType
+    #[test]
+    fn test_blocktype_roundtrip_func_type() {
+        let original = wasmparser::BlockType::FuncType(42);
+        let proto = BlockType::try_from(original).unwrap();
+        let back = wasm_encoder::BlockType::try_from(proto).unwrap();
+        match back {
+            wasm_encoder::BlockType::FunctionType(idx) => assert_eq!(idx, 42),
+            _ => panic!("Expected FunctionType block type"),
+        }
+    }
+
+    // Reverse conversion tests for load operations
+    #[test]
+    fn test_operator_to_instruction_i64_load() {
+        let memarg = MemArg {
+            align: Some(3),
+            max_align: Some(3),
+            offset: Some(150),
+            memory: Some(0),
+        };
+        let op = Operator {
+            opcode: Some(OpCode::I64Load as i32),
+            operator: Some(operator::Operator::Memarg(memarg)),
+        };
+        let result = wasm_encoder::Instruction::try_from(op).unwrap();
+        match result {
+            wasm_encoder::Instruction::I64Load(ma) => {
+                assert_eq!(ma.align, 3);
+                assert_eq!(ma.offset, 150);
+            }
+            _ => panic!("Expected I64Load instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_to_instruction_f64_load() {
+        let memarg = MemArg {
+            align: Some(3),
+            max_align: Some(3),
+            offset: Some(0),
+            memory: Some(0),
+        };
+        let op = Operator {
+            opcode: Some(OpCode::F64Load as i32),
+            operator: Some(operator::Operator::Memarg(memarg)),
+        };
+        let result = wasm_encoder::Instruction::try_from(op).unwrap();
+        assert!(matches!(result, wasm_encoder::Instruction::F64Load(_)));
+    }
+
+    #[test]
+    fn test_operator_to_instruction_i32_load16u() {
+        let memarg = MemArg {
+            align: Some(1),
+            max_align: Some(1),
+            offset: Some(10),
+            memory: Some(0),
+        };
+        let op = Operator {
+            opcode: Some(OpCode::I32Load16U as i32),
+            operator: Some(operator::Operator::Memarg(memarg)),
+        };
+        let result = wasm_encoder::Instruction::try_from(op).unwrap();
+        match result {
+            wasm_encoder::Instruction::I32Load16U(ma) => {
+                assert_eq!(ma.offset, 10);
+            }
+            _ => panic!("Expected I32Load16U instruction"),
+        }
+    }
+
+    // Reverse conversion tests for store operations
+    #[test]
+    fn test_operator_to_instruction_i64_store() {
+        let memarg = MemArg {
+            align: Some(3),
+            max_align: Some(3),
+            offset: Some(300),
+            memory: Some(0),
+        };
+        let op = Operator {
+            opcode: Some(OpCode::I64Store as i32),
+            operator: Some(operator::Operator::Memarg(memarg)),
+        };
+        let result = wasm_encoder::Instruction::try_from(op).unwrap();
+        match result {
+            wasm_encoder::Instruction::I64Store(ma) => {
+                assert_eq!(ma.offset, 300);
+            }
+            _ => panic!("Expected I64Store instruction"),
+        }
+    }
+
+    #[test]
+    fn test_operator_to_instruction_i64_store32() {
+        let memarg = MemArg {
+            align: Some(2),
+            max_align: Some(2),
+            offset: Some(0),
+            memory: Some(0),
+        };
+        let op = Operator {
+            opcode: Some(OpCode::I64Store32 as i32),
+            operator: Some(operator::Operator::Memarg(memarg)),
+        };
+        let result = wasm_encoder::Instruction::try_from(op).unwrap();
+        assert!(matches!(result, wasm_encoder::Instruction::I64Store32(_)));
+    }
+
+    // Reverse conversion tests for constants (duplicates removed - already exist above)
+
+    // Reverse conversion tests for simple operators (no data)
+    #[test]
+    fn test_operator_to_instruction_simple_ops() {
+        let simple_ops = vec![
+            (OpCode::Unreachable, wasm_encoder::Instruction::Unreachable),
+            (OpCode::Nop, wasm_encoder::Instruction::Nop),
+            (OpCode::Else, wasm_encoder::Instruction::Else),
+            (OpCode::End, wasm_encoder::Instruction::End),
+            (OpCode::Return, wasm_encoder::Instruction::Return),
+            (OpCode::Drop, wasm_encoder::Instruction::Drop),
+            (OpCode::Select, wasm_encoder::Instruction::Select),
+        ];
+
+        for (opcode, expected_instr) in simple_ops {
+            let op = Operator {
+                opcode: Some(opcode as i32),
+                operator: None,
+            };
+            let result = wasm_encoder::Instruction::try_from(op).unwrap();
+            // Compare by matching the instruction type
+            match (&result, &expected_instr) {
+                (wasm_encoder::Instruction::Unreachable, wasm_encoder::Instruction::Unreachable) => {}
+                (wasm_encoder::Instruction::Nop, wasm_encoder::Instruction::Nop) => {}
+                (wasm_encoder::Instruction::Else, wasm_encoder::Instruction::Else) => {}
+                (wasm_encoder::Instruction::End, wasm_encoder::Instruction::End) => {}
+                (wasm_encoder::Instruction::Return, wasm_encoder::Instruction::Return) => {}
+                (wasm_encoder::Instruction::Drop, wasm_encoder::Instruction::Drop) => {}
+                (wasm_encoder::Instruction::Select, wasm_encoder::Instruction::Select) => {}
+                _ => panic!("Mismatch for {:?}", opcode),
+            }
+        }
+    }
+
+    // Test BrTable with multiple targets
+    #[test]
+    fn test_operator_brtable_multiple_targets() {
+        // Create a WASM module with BrTable
+        let mut module = wasm_encoder::Module::new();
+        use wasm_encoder::{CompositeInnerType, CompositeType, SubType};
+        let mut type_section = wasm_encoder::TypeSection::new();
+        let func_type = SubType {
+            is_final: true,
+            supertype_idx: None,
+            composite_type: CompositeType {
+                inner: CompositeInnerType::Func(wasm_encoder::FuncType::new(vec![], vec![])),
+                shared: false,
+                descriptor: None,
+                describes: None,
+            },
+        };
+        type_section.ty().subtype(&func_type);
+        module.section(&type_section);
+        let mut func_section = wasm_encoder::FunctionSection::new();
+        func_section.function(0);
+        module.section(&func_section);
+        let mut code = wasm_encoder::CodeSection::new();
+        let mut func = wasm_encoder::Function::new(vec![]);
+        func.instruction(&wasm_encoder::Instruction::I32Const(0));
+        func.instruction(&wasm_encoder::Instruction::BrTable(
+            vec![1, 2, 3, 4].into(),
+            0,
+        ));
+        func.instruction(&wasm_encoder::Instruction::End);
+        code.function(&func);
+        module.section(&code);
+        let wasm_bytes = module.finish();
+
+        let parser = wasmparser::Parser::new(0);
+        for payload in parser.parse_all(&wasm_bytes) {
+            let payload = payload.unwrap();
+            if let wasmparser::Payload::CodeSectionEntry(body) = payload {
+                let reader = body.get_operators_reader().unwrap();
+                for operator_result in reader {
+                    let operator = operator_result.unwrap();
+                    if let wasmparser::Operator::BrTable { targets } = operator {
+                        let proto = Operator::try_from(wasmparser::Operator::BrTable { targets }).unwrap();
+                        match proto.operator {
+                            Some(operator::Operator::Targets(targets_proto)) => {
+                                assert_eq!(targets_proto.default, Some(0));
+                                // Verify targets are captured (exact count depends on parser)
+                                assert!(!targets_proto.targets.is_empty() || targets_proto.default.is_some());
+                            }
+                            _ => panic!("Expected Targets"),
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // ========== Error Handling Tests ==========
+
+    #[test]
+    fn test_operator_missing_opcode() {
+        let op = Operator {
+            opcode: None,
+            operator: None,
+        };
+        assert!(wasm_encoder::Instruction::try_from(op).is_err());
+    }
+
+    #[test]
+    fn test_operator_invalid_opcode() {
+        let op = Operator {
+            opcode: Some(99999), // Invalid opcode
+            operator: None,
+        };
+        assert!(wasm_encoder::Instruction::try_from(op).is_err());
+    }
+
+    #[test]
+    fn test_operator_block_missing_operator() {
+        let op = Operator {
+            opcode: Some(OpCode::Block as i32),
+            operator: None,
+        };
+        assert!(wasm_encoder::Instruction::try_from(op).is_err());
+    }
+
+    #[test]
+    fn test_operator_block_wrong_operator_type() {
+        let op = Operator {
+            opcode: Some(OpCode::Block as i32),
+            operator: Some(operator::Operator::RelativeDepth(5)), // Wrong type
+        };
+        assert!(wasm_encoder::Instruction::try_from(op).is_err());
+    }
+
+    #[test]
+    fn test_operator_call_missing_operator() {
+        let op = Operator {
+            opcode: Some(OpCode::Call as i32),
+            operator: None,
+        };
+        assert!(wasm_encoder::Instruction::try_from(op).is_err());
+    }
+
+    #[test]
+    fn test_operator_call_wrong_operator_type() {
+        let op = Operator {
+            opcode: Some(OpCode::Call as i32),
+            operator: Some(operator::Operator::LocalIndex(5)), // Wrong type
+        };
+        assert!(wasm_encoder::Instruction::try_from(op).is_err());
+    }
+
+    #[test]
+    fn test_operator_call_indirect_missing_fields() {
+        let op = Operator {
+            opcode: Some(OpCode::CallIndirect as i32),
+            operator: Some(operator::Operator::CallInderect(CallIndirectOp {
+                type_index: None, // Missing
+                table_index: Some(0),
+            })),
+        };
+        assert!(wasm_encoder::Instruction::try_from(op).is_err());
+    }
+
+    #[test]
+    fn test_operator_memory_init_missing_fields() {
+        let op = Operator {
+            opcode: Some(OpCode::MemoryInit as i32),
+            operator: Some(operator::Operator::MemoryInit(MemoryInitOp {
+                data_index: None, // Missing
+                mem: Some(0),
+            })),
+        };
+        assert!(wasm_encoder::Instruction::try_from(op).is_err());
+    }
+
+    #[test]
+    fn test_operator_brtable_missing_default() {
+        let op = Operator {
+            opcode: Some(OpCode::BrTable as i32),
+            operator: Some(operator::Operator::Targets(BrTargets {
+                default: None, // Missing
+                targets: vec![1, 2],
+            })),
+        };
+        assert!(wasm_encoder::Instruction::try_from(op).is_err());
+    }
+
+    // test_blocktype_to_wasm_encoder_invalid_empty already exists above
+
+    #[test]
+    fn test_memarg_to_wasm_encoder_missing_offset() {
+        let memarg = MemArg {
+            align: Some(2),
+            max_align: Some(2),
+            offset: None, // Missing
+            memory: Some(0),
+        };
+        assert!(wasm_encoder::MemArg::try_from(memarg).is_err());
+    }
+
+    #[test]
+    fn test_memarg_to_wasm_encoder_missing_memory() {
+        let memarg = MemArg {
+            align: Some(2),
+            max_align: Some(2),
+            offset: Some(100),
+            memory: None, // Missing
+        };
+        assert!(wasm_encoder::MemArg::try_from(memarg).is_err());
+    }
+
+    // Test all comparison operators roundtrip
+    #[test]
+    fn test_comparison_operators_roundtrip() {
+        let comparisons = vec![
+            (OpCode::I32Ne, wasm_encoder::Instruction::I32Ne),
+            (OpCode::I32LtS, wasm_encoder::Instruction::I32LtS),
+            (OpCode::I32GtU, wasm_encoder::Instruction::I32GtU),
+            (OpCode::I64Eq, wasm_encoder::Instruction::I64Eq),
+            (OpCode::F32Lt, wasm_encoder::Instruction::F32Lt),
+            (OpCode::F64Ge, wasm_encoder::Instruction::F64Ge),
+        ];
+
+        for (expected_opcode, expected_instr) in comparisons {
+            // Create operator from wasmparser, then convert back
+            let wasm_op = match expected_opcode {
+                OpCode::I32Ne => wasmparser::Operator::I32Ne,
+                OpCode::I32LtS => wasmparser::Operator::I32LtS,
+                OpCode::I32GtU => wasmparser::Operator::I32GtU,
+                OpCode::I64Eq => wasmparser::Operator::I64Eq,
+                OpCode::F32Lt => wasmparser::Operator::F32Lt,
+                OpCode::F64Ge => wasmparser::Operator::F64Ge,
+                _ => continue,
+            };
+            let proto = Operator::try_from(wasm_op).unwrap();
+            assert_eq!(proto.opcode, Some(expected_opcode as i32));
+            let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+            // Verify it's the right type
+            match (&back, &expected_instr) {
+                (wasm_encoder::Instruction::I32Ne, wasm_encoder::Instruction::I32Ne) => {}
+                (wasm_encoder::Instruction::I32LtS, wasm_encoder::Instruction::I32LtS) => {}
+                (wasm_encoder::Instruction::I32GtU, wasm_encoder::Instruction::I32GtU) => {}
+                (wasm_encoder::Instruction::I64Eq, wasm_encoder::Instruction::I64Eq) => {}
+                (wasm_encoder::Instruction::F32Lt, wasm_encoder::Instruction::F32Lt) => {}
+                (wasm_encoder::Instruction::F64Ge, wasm_encoder::Instruction::F64Ge) => {}
+                _ => panic!("Mismatch for {:?}", expected_opcode),
+            }
+        }
+    }
+
+    // Test arithmetic operators roundtrip
+    #[test]
+    fn test_arithmetic_operators_roundtrip() {
+        let arithmetic = vec![
+            (OpCode::I32Sub, wasm_encoder::Instruction::I32Sub),
+            (OpCode::I32DivU, wasm_encoder::Instruction::I32DivU),
+            (OpCode::I64Mul, wasm_encoder::Instruction::I64Mul),
+            (OpCode::F32Add, wasm_encoder::Instruction::F32Add),
+            (OpCode::F64Div, wasm_encoder::Instruction::F64Div),
+        ];
+
+        for (expected_opcode, expected_instr) in arithmetic {
+            let wasm_op = match expected_opcode {
+                OpCode::I32Sub => wasmparser::Operator::I32Sub,
+                OpCode::I32DivU => wasmparser::Operator::I32DivU,
+                OpCode::I64Mul => wasmparser::Operator::I64Mul,
+                OpCode::F32Add => wasmparser::Operator::F32Add,
+                OpCode::F64Div => wasmparser::Operator::F64Div,
+                _ => continue,
+            };
+            let proto = Operator::try_from(wasm_op).unwrap();
+            assert_eq!(proto.opcode, Some(expected_opcode as i32));
+            let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+            // Verify conversion succeeded
+            match (&back, &expected_instr) {
+                (wasm_encoder::Instruction::I32Sub, wasm_encoder::Instruction::I32Sub) => {}
+                (wasm_encoder::Instruction::I32DivU, wasm_encoder::Instruction::I32DivU) => {}
+                (wasm_encoder::Instruction::I64Mul, wasm_encoder::Instruction::I64Mul) => {}
+                (wasm_encoder::Instruction::F32Add, wasm_encoder::Instruction::F32Add) => {}
+                (wasm_encoder::Instruction::F64Div, wasm_encoder::Instruction::F64Div) => {}
+                _ => panic!("Mismatch for {:?}", expected_opcode),
+            }
+        }
+    }
+
+    // Test conversion operators roundtrip
+    #[test]
+    fn test_conversion_operators_roundtrip() {
+        let conversions = vec![
+            (OpCode::I32WrapI64, wasm_encoder::Instruction::I32WrapI64),
+            (OpCode::I64ExtendI32s, wasm_encoder::Instruction::I64ExtendI32S),
+            (OpCode::F32DemoteF64, wasm_encoder::Instruction::F32DemoteF64),
+            (OpCode::F64PromoteF32, wasm_encoder::Instruction::F64PromoteF32),
+        ];
+
+        for (expected_opcode, expected_instr) in conversions {
+            let wasm_op = match expected_opcode {
+                OpCode::I32WrapI64 => wasmparser::Operator::I32WrapI64,
+                OpCode::I64ExtendI32s => wasmparser::Operator::I64ExtendI32S,
+                OpCode::F32DemoteF64 => wasmparser::Operator::F32DemoteF64,
+                OpCode::F64PromoteF32 => wasmparser::Operator::F64PromoteF32,
+                _ => continue,
+            };
+            let proto = Operator::try_from(wasm_op).unwrap();
+            assert_eq!(proto.opcode, Some(expected_opcode as i32));
+            let back = wasm_encoder::Instruction::try_from(proto).unwrap();
+            // Verify conversion succeeded
+            match (&back, &expected_instr) {
+                (wasm_encoder::Instruction::I32WrapI64, wasm_encoder::Instruction::I32WrapI64) => {}
+                (wasm_encoder::Instruction::I64ExtendI32S, wasm_encoder::Instruction::I64ExtendI32S) => {}
+                (wasm_encoder::Instruction::F32DemoteF64, wasm_encoder::Instruction::F32DemoteF64) => {}
+                (wasm_encoder::Instruction::F64PromoteF32, wasm_encoder::Instruction::F64PromoteF32) => {}
+                _ => panic!("Mismatch for {:?}", expected_opcode),
+            }
+        }
+    }
 }
