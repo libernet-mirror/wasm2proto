@@ -1,17 +1,17 @@
 //
-// Protocol for serializing WebAssembly into Libernet format
+// Protocol for serializing WebAssembly into the Libernet format
 //
-// Libernet support WebAssembly MVP and following extensions:
+// Libernet supports WebAssembly MVP and the following extensions:
 // - sign_extension
 // - saturating_float_to_int
 // - bulk_memory
 // - exceptions
 // - legacy_exceptions
 //
-// Supported sections:
+// Limitations:
 //
 // TypeSection
-//   - Only FuncType is supported
+//   - Only `externref` and `funcref` are supported (covers 100% of MVP + listed extensions)
 //
 // ImportSection
 //   - Only single imports are supported
@@ -19,7 +19,7 @@
 //
 // TableSection
 //   - Table initialization is not supported
-//   - Only funcref tables are supported
+
 
 syntax = "proto2";
 

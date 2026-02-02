@@ -12,6 +12,10 @@ impl TryFrom<wasmparser::RefType> for ERefType {
                 shared: false,
                 ty: AbstractHeapType::Func,
             } => Ok(ERefType::RefFunc),
+            HeapType::Abstract {
+                shared: false,
+                ty: AbstractHeapType::Extern,
+            } => Ok(ERefType::ExternRef),
             _ => {
                 bail!("Only reffunc elements are supported");
             }
@@ -22,8 +26,11 @@ impl TryFrom<wasmparser::RefType> for ERefType {
 impl TryFrom<ERefType> for wasm_encoder::RefType {
     type Error = anyhow::Error;
 
-    fn try_from(_ref_type: ERefType) -> Result<Self> {
-        Ok(wasm_encoder::RefType::FUNCREF)
+    fn try_from(ref_type: ERefType) -> Result<Self> {
+        match ref_type {
+            ERefType::RefFunc => Ok(wasm_encoder::RefType::FUNCREF),
+            ERefType::ExternRef => Ok(wasm_encoder::RefType::EXTERNREF),
+        }
     }
 }
 

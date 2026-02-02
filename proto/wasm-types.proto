@@ -11,6 +11,7 @@ enum EValueType {
 
 enum ERefType {
   RefFunc = 1;
+  ExternRef = 2;
 }
 
 message ValueType {
