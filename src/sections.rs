@@ -249,7 +249,7 @@ impl ImportSection {
                             refs.push(TypeRefFunc {
                                 module: Some(module),
                                 name: Some(name),
-                                ftype: Some(ftype),
+                                function_type: Some(ftype),
                             });
                         }
                         _ => bail!("ImportSection: only Func type imports are supported"),
@@ -279,7 +279,11 @@ impl ImportSection {
                     .as_ref()
                     .ok_or(anyhow!("Name not found"))?
                     .as_str(),
-                EntityType::Function(import.ftype.ok_or(anyhow!("Function type not found"))?),
+                EntityType::Function(
+                    import
+                        .function_type
+                        .ok_or(anyhow!("Function type not found"))?,
+                ),
             );
         }
         module.section(&imports);
@@ -323,7 +327,7 @@ impl TableSection {
             }
 
             proto_tables.push(TableType {
-                ref_type: Some(ERefType::try_from(table.ty.element_type)? as i32),
+                reference_type: Some(RefType::try_from(table.ty.element_type)? as i32),
                 table64: Some(table.ty.table64),
                 initial: Some(table.ty.initial),
                 maximum: table.ty.maximum,
@@ -339,7 +343,8 @@ impl TableSection {
         use wasm_encoder::{TableSection, TableType};
         let mut table_types = TableSection::new();
         for ty in &self.types {
-            let ref_type = ERefType::try_from(ty.ref_type.ok_or(anyhow!("Ref type not found"))?)?;
+            let ref_type =
+                RefType::try_from(ty.reference_type.ok_or(anyhow!("Ref type not found"))?)?;
             table_types.table(TableType {
                 element_type: ref_type.try_into()?,
                 table64: ty.table64.ok_or(anyhow!("Table64 not found"))?,
@@ -395,7 +400,7 @@ impl GlobalSection {
         for global in section {
             let global = global?;
             globals.push(Global {
-                ty: Some(GlobalType {
+                r#type: Some(GlobalType {
                     content_type: Some(ValueType::try_from(global.ty.content_type)?),
                     mutable: Some(global.ty.mutable),
                     shared: Some(global.ty.shared),
@@ -409,7 +414,10 @@ impl GlobalSection {
         use wasm_encoder::{ConstExpr, GlobalSection, GlobalType};
         let mut globals = GlobalSection::new();
         for global in &self.globals {
-            let ty = global.ty.as_ref().ok_or(anyhow!("Global type not found"))?;
+            let ty = global
+                .r#type
+                .as_ref()
+                .ok_or(anyhow!("Global type not found"))?;
             let init_expr = global
                 .init_expr
                 .clone()
@@ -490,7 +498,7 @@ impl ElementSection {
                         expressions.push(Expression::try_from(expression?)?);
                     }
                     element::Items::Expressions(ElementExpressions {
-                        ref_type: Some(ERefType::try_from(ref_type)? as i32),
+                        reference_type: Some(RefType::try_from(ref_type)? as i32),
                         expressions,
                     })
                 }
@@ -507,12 +515,13 @@ impl ElementSection {
 
     fn render_wasm(&self, module: &mut wasm_encoder::Module) -> Result<()> {
         use wasm_encoder::{
-            ConstExpr, ElementMode, ElementSection, ElementSegment, Elements, RefType,
+            ConstExpr, ElementMode, ElementSection, ElementSegment, Elements,
+            RefType as WasmRefType,
         };
         let mut elements = ElementSection::new();
         for element in &self.elements {
             let kind = element.kind.as_ref().ok_or(anyhow!("Kind not found"))?;
-            let ty = kind.ty.ok_or(anyhow!("Element kind type not found"))?;
+            let ty = kind.r#type.ok_or(anyhow!("Element kind type not found"))?;
             let element_mode = match ElementKindType::try_from(ty)? {
                 ElementKindType::ElPassive => ElementMode::Passive,
                 ElementKindType::ElActive => ElementMode::Active {
@@ -536,8 +545,10 @@ impl ElementSection {
                         instructions.push(ConstExpr::try_from(expression.clone())?);
                     }
                     Elements::Expressions(
-                        RefType::try_from(ERefType::try_from(
-                            expressions.ref_type.ok_or(anyhow!("Ref type not found"))?,
+                        WasmRefType::try_from(RefType::try_from(
+                            expressions
+                                .reference_type
+                                .ok_or(anyhow!("Ref type not found"))?,
                         )?)?,
                         instructions.into(),
                     )
@@ -617,7 +628,7 @@ impl DataSection {
         let mut section = DataSection::new();
         for data in &self.datas {
             let kind = data.kind.as_ref().ok_or(anyhow!("Kind not found"))?;
-            let ty = kind.ty.ok_or(anyhow!("Data kind type not found"))?;
+            let ty = kind.r#type.ok_or(anyhow!("Data kind type not found"))?;
             let data_mode = match DataKindType::try_from(ty)? {
                 DataKindType::Passive => DataSegmentMode::Passive,
                 DataKindType::Active => DataSegmentMode::Active {
@@ -651,8 +662,8 @@ impl TagSection {
                 bail!("Only Exception tags are supported");
             }
             tags.push(TagType {
-                kind: Some(TagKind::TkException as i32),
-                func_type_idx: Some(tag.func_type_idx),
+                kind: Some(TagKind::Exception as i32),
+                function_type_idx: Some(tag.func_type_idx),
             });
         }
         Ok(TagSection { tags })
@@ -664,7 +675,7 @@ impl TagSection {
             tags.tag(TagType {
                 kind: TagKind::Exception,
                 func_type_idx: tag
-                    .func_type_idx
+                    .function_type_idx
                     .ok_or(anyhow!("Func type index not found"))?,
             });
         }
