@@ -2,8 +2,8 @@ use prost::Message;
 use std::env;
 use std::fs::read;
 
-pub mod program {
-    include!(concat!(env!("OUT_DIR"), "/program.rs"));
+pub mod libernet_wasm {
+    include!(concat!(env!("OUT_DIR"), "/libernet.wasm.rs"));
 }
 
 mod helpers;

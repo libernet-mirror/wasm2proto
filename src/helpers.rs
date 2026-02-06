@@ -1,6 +1,6 @@
 use anyhow::{Ok, Result, anyhow, bail};
 
-use crate::program::*;
+use crate::libernet_wasm::*;
 
 impl TryFrom<wasmparser::RefType> for ERefType {
     type Error = anyhow::Error;
@@ -471,10 +471,8 @@ mod tests {
 
     #[test]
     fn test_element_kind_from_wasmparser_passive() {
-        use wasmparser::ElementKind;
-
-        let element_kind = ElementKind::Passive;
-        let result = crate::program::ElementKind::try_from(element_kind).unwrap();
+        let element_kind = wasmparser::ElementKind::Passive;
+        let result = ElementKind::try_from(element_kind).unwrap();
         assert_eq!(result.ty, Some(ElementKindType::ElPassive as i32));
         assert_eq!(result.table_index, None);
         assert_eq!(result.expression, None);
@@ -541,7 +539,7 @@ mod tests {
             if let wasmparser::Payload::ElementSection(section) = payload {
                 for element in section {
                     let element = element.unwrap();
-                    let result = crate::program::ElementKind::try_from(element.kind).unwrap();
+                    let result = ElementKind::try_from(element.kind).unwrap();
                     assert_eq!(result.ty, Some(ElementKindType::ElActive as i32));
                     assert_eq!(result.table_index, Some(0));
                     assert!(result.expression.is_some());
@@ -554,10 +552,8 @@ mod tests {
 
     #[test]
     fn test_element_kind_from_wasmparser_declared() {
-        use wasmparser::ElementKind;
-
-        let element_kind = ElementKind::Declared;
-        let result = crate::program::ElementKind::try_from(element_kind).unwrap();
+        let element_kind = wasmparser::ElementKind::Declared;
+        let result = ElementKind::try_from(element_kind).unwrap();
         assert_eq!(result.ty, Some(ElementKindType::ElDeclared as i32));
         assert_eq!(result.table_index, None);
         assert_eq!(result.expression, None);
@@ -565,10 +561,8 @@ mod tests {
 
     #[test]
     fn test_data_kind_from_wasmparser_passive() {
-        use wasmparser::DataKind;
-
-        let data_kind = DataKind::Passive;
-        let result = crate::program::DataKind::try_from(data_kind).unwrap();
+        let data_kind = wasmparser::DataKind::Passive;
+        let result = DataKind::try_from(data_kind).unwrap();
         assert_eq!(result.ty, Some(DataKindType::Passive as i32));
         assert_eq!(result.memory_index, None);
         assert_eq!(result.expression, None);
@@ -615,7 +609,7 @@ mod tests {
             if let wasmparser::Payload::DataSection(section) = payload {
                 for data in section {
                     let data = data.unwrap();
-                    let result = crate::program::DataKind::try_from(data.kind).unwrap();
+                    let result = DataKind::try_from(data.kind).unwrap();
                     assert_eq!(result.ty, Some(DataKindType::Active as i32));
                     assert_eq!(result.memory_index, Some(0));
                     assert!(result.expression.is_some());

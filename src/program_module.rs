@@ -1,4 +1,4 @@
-use crate::program::*;
+use crate::libernet_wasm::*;
 use anyhow::{Ok, Result, anyhow};
 
 pub fn from_wasm(bytes: &[u8]) -> Result<ProgramModule> {

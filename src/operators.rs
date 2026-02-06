@@ -1,4 +1,4 @@
-use crate::program::*;
+use crate::libernet_wasm::*;
 use anyhow::{Ok, Result, anyhow};
 
 impl TryFrom<wasmparser::BlockType> for BlockType {
@@ -25,7 +25,7 @@ impl TryFrom<BlockType> for wasm_encoder::BlockType {
     type Error = anyhow::Error;
 
     fn try_from(blocktype: BlockType) -> Result<Self> {
-        use crate::program::block_type::Blockty;
+        use crate::libernet_wasm::block_type::Blockty;
         use wasm_encoder::BlockType;
         match blocktype.blockty.ok_or(anyhow!("Block type not found"))? {
             Blockty::Empty(0) => Ok(BlockType::Empty),
