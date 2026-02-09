@@ -817,99 +817,99 @@ impl TryFrom<wasmparser::Operator<'_>> for Operator {
 
             // @sign_extension
             wasmparser::Operator::I32Extend8S => Ok(Operator {
-                opcode: Some(OpCode::I32Extend8Signed as i32),
+                opcode: Some(OpCode::SignExtI32Extend8Signed as i32),
                 ..Operator::default()
             }),
             wasmparser::Operator::I32Extend16S => Ok(Operator {
-                opcode: Some(OpCode::I32Extend16Signed as i32),
+                opcode: Some(OpCode::SignExtI32Extend16Signed as i32),
                 ..Operator::default()
             }),
             wasmparser::Operator::I64Extend8S => Ok(Operator {
-                opcode: Some(OpCode::I64Extend8Signed as i32),
+                opcode: Some(OpCode::SignExtI64Extend8Signed as i32),
                 ..Operator::default()
             }),
             wasmparser::Operator::I64Extend16S => Ok(Operator {
-                opcode: Some(OpCode::I64Extend16Signed as i32),
+                opcode: Some(OpCode::SignExtI64Extend16Signed as i32),
                 ..Operator::default()
             }),
             wasmparser::Operator::I64Extend32S => Ok(Operator {
-                opcode: Some(OpCode::I64Extend32Signed as i32),
+                opcode: Some(OpCode::SignExtI64Extend32Signed as i32),
                 ..Operator::default()
             }),
 
             // @saturating_float_to_int
             wasmparser::Operator::I32TruncSatF32S => Ok(Operator {
-                opcode: Some(OpCode::I32TruncSatF32Signed as i32),
+                opcode: Some(OpCode::SaturatingFloatToIntExtI32TruncSatF32Signed as i32),
                 ..Operator::default()
             }),
             wasmparser::Operator::I32TruncSatF32U => Ok(Operator {
-                opcode: Some(OpCode::I32TruncSatF32Unsigned as i32),
+                opcode: Some(OpCode::SaturatingFloatToIntExtI32TruncSatF32Unsigned as i32),
                 ..Operator::default()
             }),
             wasmparser::Operator::I32TruncSatF64S => Ok(Operator {
-                opcode: Some(OpCode::I32TruncSatF64Signed as i32),
+                opcode: Some(OpCode::SaturatingFloatToIntExtI32TruncSatF64Signed as i32),
                 ..Operator::default()
             }),
             wasmparser::Operator::I32TruncSatF64U => Ok(Operator {
-                opcode: Some(OpCode::I32TruncSatF64Unsigned as i32),
+                opcode: Some(OpCode::SaturatingFloatToIntExtI32TruncSatF64Unsigned as i32),
                 ..Operator::default()
             }),
             wasmparser::Operator::I64TruncSatF32S => Ok(Operator {
-                opcode: Some(OpCode::I64TruncSatF32Signed as i32),
+                opcode: Some(OpCode::SaturatingFloatToIntExtI64TruncSatF32Signed as i32),
                 ..Operator::default()
             }),
             wasmparser::Operator::I64TruncSatF32U => Ok(Operator {
-                opcode: Some(OpCode::I64TruncSatF32Unsigned as i32),
+                opcode: Some(OpCode::SaturatingFloatToIntExtI64TruncSatF32Unsigned as i32),
                 ..Operator::default()
             }),
             wasmparser::Operator::I64TruncSatF64S => Ok(Operator {
-                opcode: Some(OpCode::I64TruncSatF64Signed as i32),
+                opcode: Some(OpCode::SaturatingFloatToIntExtI64TruncSatF64Signed as i32),
                 ..Operator::default()
             }),
             wasmparser::Operator::I64TruncSatF64U => Ok(Operator {
-                opcode: Some(OpCode::I64TruncSatF64Unsigned as i32),
+                opcode: Some(OpCode::SaturatingFloatToIntExtI64TruncSatF64Unsigned as i32),
                 ..Operator::default()
             }),
 
             // @bulk_memory
             wasmparser::Operator::MemoryInit { data_index, mem } => Ok(Operator {
-                opcode: Some(OpCode::MemoryInit as i32),
+                opcode: Some(OpCode::BulkMemoryExtMemoryInit as i32),
                 operator: Some(operator::Operator::MemoryInit(MemoryInitOp {
                     data_index: Some(data_index),
                     address: Some(mem),
                 })),
             }),
             wasmparser::Operator::DataDrop { data_index } => Ok(Operator {
-                opcode: Some(OpCode::DataDrop as i32),
+                opcode: Some(OpCode::BulkMemoryExtDataDrop as i32),
                 operator: Some(operator::Operator::DataIndex(data_index)),
             }),
             wasmparser::Operator::MemoryCopy { dst_mem, src_mem } => Ok(Operator {
-                opcode: Some(OpCode::MemoryCopy as i32),
+                opcode: Some(OpCode::BulkMemoryExtMemoryCopy as i32),
                 operator: Some(operator::Operator::MemoryCopy(MemoryCopyOp {
                     destination_address: Some(dst_mem),
                     source_address: Some(src_mem),
                 })),
             }),
             wasmparser::Operator::MemoryFill { mem } => Ok(Operator {
-                opcode: Some(OpCode::MemoryFill as i32),
+                opcode: Some(OpCode::BulkMemoryExtMemoryFill as i32),
                 operator: Some(operator::Operator::Mem(mem)),
             }),
             wasmparser::Operator::TableInit { elem_index, table } => Ok(Operator {
-                opcode: Some(OpCode::TableInit as i32),
+                opcode: Some(OpCode::BulkMemoryExtTableInit as i32),
                 operator: Some(operator::Operator::TableInit(TableInitOp {
                     element_index: Some(elem_index),
                     table: Some(table),
                 })),
             }),
             wasmparser::Operator::ElemDrop { elem_index } => Ok(Operator {
-                opcode: Some(OpCode::ElemDrop as i32),
+                opcode: Some(OpCode::BulkMemoryExtElemDrop as i32),
                 operator: Some(operator::Operator::ElementIndex(elem_index)),
             }),
             wasmparser::Operator::TableCopy {
                 dst_table,
                 src_table,
             } => Ok(Operator {
-                opcode: Some(OpCode::TableCopy as i32),
+                opcode: Some(OpCode::BulkMemoryExtTableCopy as i32),
                 operator: Some(operator::Operator::TableCopy(TableCopyOp {
                     dst_table: Some(dst_table),
                     src_table: Some(src_table),
@@ -922,7 +922,7 @@ impl TryFrom<wasmparser::Operator<'_>> for Operator {
                     catches.push(CatchElement::try_from(catch)?);
                 }
                 Ok(Operator {
-                    opcode: Some(OpCode::TryTable as i32),
+                    opcode: Some(OpCode::ExceptionsExtTryTable as i32),
                     operator: Some(operator::Operator::TryTable(TryTableOp {
                         r#type: Some(BlockType::try_from(try_table.ty)?),
                         catches,
@@ -930,34 +930,34 @@ impl TryFrom<wasmparser::Operator<'_>> for Operator {
                 })
             }
             wasmparser::Operator::Throw { tag_index } => Ok(Operator {
-                opcode: Some(OpCode::Throw as i32),
+                opcode: Some(OpCode::ExceptionsExtThrow as i32),
                 operator: Some(operator::Operator::ThrowOp(ThrowOp {
                     tag_index: Some(tag_index),
                 })),
             }),
             wasmparser::Operator::ThrowRef {} => Ok(Operator {
-                opcode: Some(OpCode::ThrowRef as i32),
+                opcode: Some(OpCode::ExceptionsExtThrowRef as i32),
                 ..Operator::default()
             }),
             // @legacy_exceptions
             wasmparser::Operator::Try { blockty } => Ok(Operator {
-                opcode: Some(OpCode::Try as i32),
+                opcode: Some(OpCode::LegacyExceptionsExtTry as i32),
                 operator: Some(operator::Operator::BlockType(BlockType::try_from(blockty)?)),
             }),
             wasmparser::Operator::Catch { tag_index } => Ok(Operator {
-                opcode: Some(OpCode::Catch as i32),
+                opcode: Some(OpCode::LegacyExceptionsExtCatch as i32),
                 operator: Some(operator::Operator::TagIndex(tag_index)),
             }),
             wasmparser::Operator::Rethrow { relative_depth } => Ok(Operator {
-                opcode: Some(OpCode::Rethrow as i32),
+                opcode: Some(OpCode::LegacyExceptionsExtRethrow as i32),
                 operator: Some(operator::Operator::RelativeDepth(relative_depth)),
             }),
             wasmparser::Operator::Delegate { relative_depth } => Ok(Operator {
-                opcode: Some(OpCode::Delegate as i32),
+                opcode: Some(OpCode::LegacyExceptionsExtDelegate as i32),
                 operator: Some(operator::Operator::RelativeDepth(relative_depth)),
             }),
             wasmparser::Operator::CatchAll {} => Ok(Operator {
-                opcode: Some(OpCode::CatchAll as i32),
+                opcode: Some(OpCode::LegacyExceptionsExtCatchAll as i32),
                 ..Operator::default()
             }),
             _ => Err(anyhow!("Got unsupported operator: {:?}", operator)),
@@ -1536,20 +1536,36 @@ impl TryFrom<Operator> for wasm_encoder::Instruction<'_> {
             OpCode::I64ReinterpretF64 => Ok(wasm_encoder::Instruction::I64ReinterpretF64),
             OpCode::F32ReinterpretI32 => Ok(wasm_encoder::Instruction::F32ReinterpretI32),
             OpCode::F64ReinterpretI64 => Ok(wasm_encoder::Instruction::F64ReinterpretI64),
-            OpCode::I32Extend8Signed => Ok(wasm_encoder::Instruction::I32Extend8S),
-            OpCode::I32Extend16Signed => Ok(wasm_encoder::Instruction::I32Extend16S),
-            OpCode::I64Extend8Signed => Ok(wasm_encoder::Instruction::I64Extend8S),
-            OpCode::I64Extend16Signed => Ok(wasm_encoder::Instruction::I64Extend16S),
-            OpCode::I64Extend32Signed => Ok(wasm_encoder::Instruction::I64Extend32S),
-            OpCode::I32TruncSatF32Signed => Ok(wasm_encoder::Instruction::I32TruncSatF32S),
-            OpCode::I32TruncSatF32Unsigned => Ok(wasm_encoder::Instruction::I32TruncSatF32U),
-            OpCode::I32TruncSatF64Signed => Ok(wasm_encoder::Instruction::I32TruncSatF64S),
-            OpCode::I32TruncSatF64Unsigned => Ok(wasm_encoder::Instruction::I32TruncSatF64U),
-            OpCode::I64TruncSatF32Signed => Ok(wasm_encoder::Instruction::I64TruncSatF32S),
-            OpCode::I64TruncSatF32Unsigned => Ok(wasm_encoder::Instruction::I64TruncSatF32U),
-            OpCode::I64TruncSatF64Signed => Ok(wasm_encoder::Instruction::I64TruncSatF64S),
-            OpCode::I64TruncSatF64Unsigned => Ok(wasm_encoder::Instruction::I64TruncSatF64U),
-            OpCode::MemoryInit => {
+            OpCode::SignExtI32Extend8Signed => Ok(wasm_encoder::Instruction::I32Extend8S),
+            OpCode::SignExtI32Extend16Signed => Ok(wasm_encoder::Instruction::I32Extend16S),
+            OpCode::SignExtI64Extend8Signed => Ok(wasm_encoder::Instruction::I64Extend8S),
+            OpCode::SignExtI64Extend16Signed => Ok(wasm_encoder::Instruction::I64Extend16S),
+            OpCode::SignExtI64Extend32Signed => Ok(wasm_encoder::Instruction::I64Extend32S),
+            OpCode::SaturatingFloatToIntExtI32TruncSatF32Signed => {
+                Ok(wasm_encoder::Instruction::I32TruncSatF32S)
+            }
+            OpCode::SaturatingFloatToIntExtI32TruncSatF32Unsigned => {
+                Ok(wasm_encoder::Instruction::I32TruncSatF32U)
+            }
+            OpCode::SaturatingFloatToIntExtI32TruncSatF64Signed => {
+                Ok(wasm_encoder::Instruction::I32TruncSatF64S)
+            }
+            OpCode::SaturatingFloatToIntExtI32TruncSatF64Unsigned => {
+                Ok(wasm_encoder::Instruction::I32TruncSatF64U)
+            }
+            OpCode::SaturatingFloatToIntExtI64TruncSatF32Signed => {
+                Ok(wasm_encoder::Instruction::I64TruncSatF32S)
+            }
+            OpCode::SaturatingFloatToIntExtI64TruncSatF32Unsigned => {
+                Ok(wasm_encoder::Instruction::I64TruncSatF32U)
+            }
+            OpCode::SaturatingFloatToIntExtI64TruncSatF64Signed => {
+                Ok(wasm_encoder::Instruction::I64TruncSatF64S)
+            }
+            OpCode::SaturatingFloatToIntExtI64TruncSatF64Unsigned => {
+                Ok(wasm_encoder::Instruction::I64TruncSatF64U)
+            }
+            OpCode::BulkMemoryExtMemoryInit => {
                 let (data_index, mem) = match operator
                     .operator
                     .ok_or(anyhow!("MemoryInit operator not found"))?
@@ -1565,7 +1581,7 @@ impl TryFrom<Operator> for wasm_encoder::Instruction<'_> {
                 };
                 Ok(wasm_encoder::Instruction::MemoryInit { mem, data_index })
             }
-            OpCode::DataDrop => {
+            OpCode::BulkMemoryExtDataDrop => {
                 let data_index = match operator
                     .operator
                     .ok_or(anyhow!("DataDrop operator not found"))?
@@ -1575,7 +1591,7 @@ impl TryFrom<Operator> for wasm_encoder::Instruction<'_> {
                 };
                 Ok(wasm_encoder::Instruction::DataDrop(data_index))
             }
-            OpCode::MemoryCopy => {
+            OpCode::BulkMemoryExtMemoryCopy => {
                 let (dst_mem, src_mem) = match operator
                     .operator
                     .ok_or(anyhow!("MemoryCopy operator not found"))?
@@ -1593,7 +1609,7 @@ impl TryFrom<Operator> for wasm_encoder::Instruction<'_> {
                 };
                 Ok(wasm_encoder::Instruction::MemoryCopy { dst_mem, src_mem })
             }
-            OpCode::MemoryFill => {
+            OpCode::BulkMemoryExtMemoryFill => {
                 let mem = match operator
                     .operator
                     .ok_or(anyhow!("MemoryFill operator not found"))?
@@ -1603,7 +1619,7 @@ impl TryFrom<Operator> for wasm_encoder::Instruction<'_> {
                 };
                 Ok(wasm_encoder::Instruction::MemoryFill(mem))
             }
-            OpCode::TableInit => {
+            OpCode::BulkMemoryExtTableInit => {
                 let (elem_index, table) = match operator
                     .operator
                     .ok_or(anyhow!("TableInit operator not found"))?
@@ -1619,7 +1635,7 @@ impl TryFrom<Operator> for wasm_encoder::Instruction<'_> {
                 };
                 Ok(wasm_encoder::Instruction::TableInit { table, elem_index })
             }
-            OpCode::ElemDrop => {
+            OpCode::BulkMemoryExtElemDrop => {
                 let elem_index = match operator
                     .operator
                     .ok_or(anyhow!("ElemDrop operator not found"))?
@@ -1629,7 +1645,7 @@ impl TryFrom<Operator> for wasm_encoder::Instruction<'_> {
                 };
                 Ok(wasm_encoder::Instruction::ElemDrop(elem_index))
             }
-            OpCode::TableCopy => {
+            OpCode::BulkMemoryExtTableCopy => {
                 let (dst_table, src_table) = match operator
                     .operator
                     .ok_or(anyhow!("TableCopy operator not found"))?
@@ -1650,7 +1666,7 @@ impl TryFrom<Operator> for wasm_encoder::Instruction<'_> {
                     src_table,
                 })
             }
-            OpCode::TryTable => {
+            OpCode::ExceptionsExtTryTable => {
                 let ty = match operator
                     .operator
                     .ok_or(anyhow!("TryTable operator not found"))?
@@ -1666,7 +1682,7 @@ impl TryFrom<Operator> for wasm_encoder::Instruction<'_> {
                     catches.into(),
                 ))
             }
-            OpCode::Throw => {
+            OpCode::ExceptionsExtThrow => {
                 let tag_index = match operator
                     .operator
                     .ok_or(anyhow!("Throw operator not found"))?
@@ -1678,15 +1694,15 @@ impl TryFrom<Operator> for wasm_encoder::Instruction<'_> {
                 };
                 Ok(wasm_encoder::Instruction::Throw(tag_index))
             }
-            OpCode::ThrowRef => Ok(wasm_encoder::Instruction::ThrowRef),
-            OpCode::Try => {
+            OpCode::ExceptionsExtThrowRef => Ok(wasm_encoder::Instruction::ThrowRef),
+            OpCode::LegacyExceptionsExtTry => {
                 let ty = match operator.operator.ok_or(anyhow!("Try operator not found"))? {
                     operator::Operator::BlockType(bt) => wasm_encoder::BlockType::try_from(bt)?,
                     _ => return Err(anyhow!("Expected BlockType for Try operator")),
                 };
                 Ok(wasm_encoder::Instruction::Try(ty))
             }
-            OpCode::Catch => {
+            OpCode::LegacyExceptionsExtCatch => {
                 let tag_index = match operator
                     .operator
                     .ok_or(anyhow!("Catch operator not found"))?
@@ -1696,7 +1712,7 @@ impl TryFrom<Operator> for wasm_encoder::Instruction<'_> {
                 };
                 Ok(wasm_encoder::Instruction::Catch(tag_index))
             }
-            OpCode::Rethrow => {
+            OpCode::LegacyExceptionsExtRethrow => {
                 let relative_depth = match operator
                     .operator
                     .ok_or(anyhow!("Rethrow operator not found"))?
@@ -1706,7 +1722,7 @@ impl TryFrom<Operator> for wasm_encoder::Instruction<'_> {
                 };
                 Ok(wasm_encoder::Instruction::Rethrow(relative_depth))
             }
-            OpCode::Delegate => {
+            OpCode::LegacyExceptionsExtDelegate => {
                 let relative_depth = match operator
                     .operator
                     .ok_or(anyhow!("Delegate operator not found"))?
@@ -1716,7 +1732,7 @@ impl TryFrom<Operator> for wasm_encoder::Instruction<'_> {
                 };
                 Ok(wasm_encoder::Instruction::Delegate(relative_depth))
             }
-            OpCode::CatchAll => Ok(wasm_encoder::Instruction::CatchAll),
+            OpCode::LegacyExceptionsExtCatchAll => Ok(wasm_encoder::Instruction::CatchAll),
         }
     }
 }
@@ -2392,14 +2408,14 @@ mod tests {
     fn test_operator_i32_extend8s() {
         let op = wasmparser::Operator::I32Extend8S;
         let result = Operator::try_from(op).unwrap();
-        assert_eq!(result.opcode, Some(OpCode::I32Extend8Signed as i32));
+        assert_eq!(result.opcode, Some(OpCode::SignExtI32Extend8Signed as i32));
     }
 
     #[test]
     fn test_operator_i64_extend32_s() {
         let op = wasmparser::Operator::I64Extend32S;
         let result = Operator::try_from(op).unwrap();
-        assert_eq!(result.opcode, Some(OpCode::I64Extend32Signed as i32));
+        assert_eq!(result.opcode, Some(OpCode::SignExtI64Extend32Signed as i32));
     }
 
     // Saturating float to int tests
@@ -2407,14 +2423,20 @@ mod tests {
     fn test_operator_i32_trunc_sat_f32_s() {
         let op = wasmparser::Operator::I32TruncSatF32S;
         let result = Operator::try_from(op).unwrap();
-        assert_eq!(result.opcode, Some(OpCode::I32TruncSatF32Signed as i32));
+        assert_eq!(
+            result.opcode,
+            Some(OpCode::SaturatingFloatToIntExtI32TruncSatF32Signed as i32)
+        );
     }
 
     #[test]
     fn test_operator_i64_trunc_sat_f64u() {
         let op = wasmparser::Operator::I64TruncSatF64U;
         let result = Operator::try_from(op).unwrap();
-        assert_eq!(result.opcode, Some(OpCode::I64TruncSatF64Unsigned as i32));
+        assert_eq!(
+            result.opcode,
+            Some(OpCode::SaturatingFloatToIntExtI64TruncSatF64Unsigned as i32)
+        );
     }
 
     // Bulk memory tests
@@ -2425,7 +2447,7 @@ mod tests {
             mem: 0,
         };
         let result = Operator::try_from(op).unwrap();
-        assert_eq!(result.opcode, Some(OpCode::MemoryInit as i32));
+        assert_eq!(result.opcode, Some(OpCode::BulkMemoryExtMemoryInit as i32));
         match result.operator {
             Some(operator::Operator::MemoryInit(mi)) => {
                 assert_eq!(mi.data_index, Some(5));
@@ -2439,7 +2461,7 @@ mod tests {
     fn test_operator_data_drop() {
         let op = wasmparser::Operator::DataDrop { data_index: 3 };
         let result = Operator::try_from(op).unwrap();
-        assert_eq!(result.opcode, Some(OpCode::DataDrop as i32));
+        assert_eq!(result.opcode, Some(OpCode::BulkMemoryExtDataDrop as i32));
         match result.operator {
             Some(operator::Operator::DataIndex(idx)) => assert_eq!(idx, 3),
             _ => panic!("Expected DataIndex"),
@@ -2453,7 +2475,7 @@ mod tests {
             src_mem: 0,
         };
         let result = Operator::try_from(op).unwrap();
-        assert_eq!(result.opcode, Some(OpCode::MemoryCopy as i32));
+        assert_eq!(result.opcode, Some(OpCode::BulkMemoryExtMemoryCopy as i32));
         match result.operator {
             Some(operator::Operator::MemoryCopy(mc)) => {
                 assert_eq!(mc.destination_address, Some(0));
@@ -2467,7 +2489,7 @@ mod tests {
     fn test_operator_memory_fill() {
         let op = wasmparser::Operator::MemoryFill { mem: 0 };
         let result = Operator::try_from(op).unwrap();
-        assert_eq!(result.opcode, Some(OpCode::MemoryFill as i32));
+        assert_eq!(result.opcode, Some(OpCode::BulkMemoryExtMemoryFill as i32));
         match result.operator {
             Some(operator::Operator::Mem(m)) => assert_eq!(m, 0),
             _ => panic!("Expected Mem"),
@@ -2481,7 +2503,7 @@ mod tests {
             table: 0,
         };
         let result = Operator::try_from(op).unwrap();
-        assert_eq!(result.opcode, Some(OpCode::TableInit as i32));
+        assert_eq!(result.opcode, Some(OpCode::BulkMemoryExtTableInit as i32));
         match result.operator {
             Some(operator::Operator::TableInit(ti)) => {
                 assert_eq!(ti.element_index, Some(2));
@@ -2495,7 +2517,7 @@ mod tests {
     fn test_operator_elem_drop() {
         let op = wasmparser::Operator::ElemDrop { elem_index: 1 };
         let result = Operator::try_from(op).unwrap();
-        assert_eq!(result.opcode, Some(OpCode::ElemDrop as i32));
+        assert_eq!(result.opcode, Some(OpCode::BulkMemoryExtElemDrop as i32));
         match result.operator {
             Some(operator::Operator::ElementIndex(idx)) => assert_eq!(idx, 1),
             _ => panic!("Expected ElementIndex"),
@@ -2509,7 +2531,7 @@ mod tests {
             src_table: 0,
         };
         let result = Operator::try_from(op).unwrap();
-        assert_eq!(result.opcode, Some(OpCode::TableCopy as i32));
+        assert_eq!(result.opcode, Some(OpCode::BulkMemoryExtTableCopy as i32));
         match result.operator {
             Some(operator::Operator::TableCopy(tc)) => {
                 assert_eq!(tc.dst_table, Some(0));
@@ -2680,7 +2702,7 @@ mod tests {
             address: Some(0),
         };
         let op = Operator {
-            opcode: Some(OpCode::MemoryInit as i32),
+            opcode: Some(OpCode::BulkMemoryExtMemoryInit as i32),
             operator: Some(operator::Operator::MemoryInit(mi)),
         };
         let result = wasm_encoder::Instruction::try_from(op).unwrap();
@@ -2700,7 +2722,7 @@ mod tests {
             src_table: Some(0),
         };
         let op = Operator {
-            opcode: Some(OpCode::TableCopy as i32),
+            opcode: Some(OpCode::BulkMemoryExtTableCopy as i32),
             operator: Some(operator::Operator::TableCopy(tc)),
         };
         let result = wasm_encoder::Instruction::try_from(op).unwrap();
@@ -2864,7 +2886,7 @@ mod tests {
             blockty: wasmparser::BlockType::Empty,
         };
         let result = Operator::try_from(op).unwrap();
-        assert_eq!(result.opcode, Some(OpCode::Try as i32));
+        assert_eq!(result.opcode, Some(OpCode::LegacyExceptionsExtTry as i32));
         assert!(matches!(
             result.operator,
             Some(operator::Operator::BlockType(_))
@@ -2875,7 +2897,7 @@ mod tests {
     fn test_operator_catch() {
         let op = wasmparser::Operator::Catch { tag_index: 42 };
         let result = Operator::try_from(op).unwrap();
-        assert_eq!(result.opcode, Some(OpCode::Catch as i32));
+        assert_eq!(result.opcode, Some(OpCode::LegacyExceptionsExtCatch as i32));
         match result.operator {
             Some(operator::Operator::TagIndex(idx)) => assert_eq!(idx, 42),
             _ => panic!("Expected TagIndex"),
@@ -2886,14 +2908,20 @@ mod tests {
     fn test_operator_catch_all() {
         let op = wasmparser::Operator::CatchAll {};
         let result = Operator::try_from(op).unwrap();
-        assert_eq!(result.opcode, Some(OpCode::CatchAll as i32));
+        assert_eq!(
+            result.opcode,
+            Some(OpCode::LegacyExceptionsExtCatchAll as i32)
+        );
     }
 
     #[test]
     fn test_operator_rethrow() {
         let op = wasmparser::Operator::Rethrow { relative_depth: 3 };
         let result = Operator::try_from(op).unwrap();
-        assert_eq!(result.opcode, Some(OpCode::Rethrow as i32));
+        assert_eq!(
+            result.opcode,
+            Some(OpCode::LegacyExceptionsExtRethrow as i32)
+        );
         match result.operator {
             Some(operator::Operator::RelativeDepth(depth)) => assert_eq!(depth, 3),
             _ => panic!("Expected RelativeDepth"),
@@ -2904,7 +2932,10 @@ mod tests {
     fn test_operator_delegate() {
         let op = wasmparser::Operator::Delegate { relative_depth: 5 };
         let result = Operator::try_from(op).unwrap();
-        assert_eq!(result.opcode, Some(OpCode::Delegate as i32));
+        assert_eq!(
+            result.opcode,
+            Some(OpCode::LegacyExceptionsExtDelegate as i32)
+        );
         match result.operator {
             Some(operator::Operator::RelativeDepth(depth)) => assert_eq!(depth, 5),
             _ => panic!("Expected RelativeDepth"),
@@ -2915,7 +2946,7 @@ mod tests {
     fn test_operator_throw() {
         let op = wasmparser::Operator::Throw { tag_index: 7 };
         let result = Operator::try_from(op).unwrap();
-        assert_eq!(result.opcode, Some(OpCode::Throw as i32));
+        assert_eq!(result.opcode, Some(OpCode::ExceptionsExtThrow as i32));
         match result.operator {
             Some(operator::Operator::ThrowOp(throw_op)) => {
                 assert_eq!(throw_op.tag_index, Some(7));
@@ -2928,7 +2959,7 @@ mod tests {
     fn test_operator_throw_ref() {
         let op = wasmparser::Operator::ThrowRef {};
         let result = Operator::try_from(op).unwrap();
-        assert_eq!(result.opcode, Some(OpCode::ThrowRef as i32));
+        assert_eq!(result.opcode, Some(OpCode::ExceptionsExtThrowRef as i32));
     }
 
     // Additional reverse conversion tests (Operator -> wasm_encoder::Instruction)
@@ -3097,7 +3128,7 @@ mod tests {
     #[test]
     fn test_operator_to_instruction_catch() {
         let op = Operator {
-            opcode: Some(OpCode::Catch as i32),
+            opcode: Some(OpCode::LegacyExceptionsExtCatch as i32),
             operator: Some(operator::Operator::TagIndex(5)),
         };
         let result = wasm_encoder::Instruction::try_from(op).unwrap();
@@ -3110,7 +3141,7 @@ mod tests {
     #[test]
     fn test_operator_to_instruction_catch_all() {
         let op = Operator {
-            opcode: Some(OpCode::CatchAll as i32),
+            opcode: Some(OpCode::LegacyExceptionsExtCatchAll as i32),
             ..Operator::default()
         };
         let result = wasm_encoder::Instruction::try_from(op).unwrap();
@@ -3124,7 +3155,7 @@ mod tests {
             source_address: Some(1),
         };
         let op = Operator {
-            opcode: Some(OpCode::MemoryCopy as i32),
+            opcode: Some(OpCode::BulkMemoryExtMemoryCopy as i32),
             operator: Some(operator::Operator::MemoryCopy(mc)),
         };
         let result = wasm_encoder::Instruction::try_from(op).unwrap();
@@ -3140,7 +3171,7 @@ mod tests {
     #[test]
     fn test_operator_to_instruction_memory_fill() {
         let op = Operator {
-            opcode: Some(OpCode::MemoryFill as i32),
+            opcode: Some(OpCode::BulkMemoryExtMemoryFill as i32),
             operator: Some(operator::Operator::Mem(2)),
         };
         let result = wasm_encoder::Instruction::try_from(op).unwrap();
@@ -3157,7 +3188,7 @@ mod tests {
             table: Some(0),
         };
         let op = Operator {
-            opcode: Some(OpCode::TableInit as i32),
+            opcode: Some(OpCode::BulkMemoryExtTableInit as i32),
             operator: Some(operator::Operator::TableInit(ti)),
         };
         let result = wasm_encoder::Instruction::try_from(op).unwrap();
@@ -3986,7 +4017,7 @@ mod tests {
     #[test]
     fn test_operator_memory_init_missing_fields() {
         let op = Operator {
-            opcode: Some(OpCode::MemoryInit as i32),
+            opcode: Some(OpCode::BulkMemoryExtMemoryInit as i32),
             operator: Some(operator::Operator::MemoryInit(MemoryInitOp {
                 data_index: None, // Missing
                 address: Some(0),
