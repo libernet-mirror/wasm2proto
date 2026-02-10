@@ -1,47 +1,103 @@
 use crate::libernet_wasm::*;
-use anyhow::{Ok, Result, anyhow};
+use crate::sections::*;
+
+use anyhow::{Ok, Result};
 
 pub fn from_wasm(bytes: &[u8]) -> Result<ProgramModule> {
     use wasmparser::Parser;
-    let mut version: Option<Version> = None;
-    let mut proto_sections: Vec<Section> = Vec::new();
+    let mut program_module = ProgramModule {
+        protocol_version: Some(1),
+        ..Default::default()
+    };
+    let mut code_entries: Vec<CodeSectionEntry> = Vec::new();
     for payload in Parser::new(0).parse_all(bytes) {
         let payload = payload?;
         if let Some(payload) = Version::from_wasmparser(&payload)? {
-            version = Some(payload);
-        } else if let Some(payload) = Section::from_wasmparser(payload)? {
-            proto_sections.push(payload);
+            program_module.version = Some(payload);
+        } else if let Some(code_entry) = CodeSectionEntry::from_wasmparser(&payload)? {
+            code_entries.push(code_entry);
+        } else {
+            match Section::from_wasmparser(payload)? {
+                Some(Section {
+                    section: section::Section::TypeSection(type_section),
+                }) => program_module.type_section = Some(type_section),
+                Some(Section {
+                    section: section::Section::ImportSection(import_section),
+                }) => program_module.import_section = Some(import_section),
+                Some(Section {
+                    section: section::Section::FunctionSection(function_section),
+                }) => program_module.function_section = Some(function_section),
+                Some(Section {
+                    section: section::Section::TableSection(table_section),
+                }) => program_module.table_section = Some(table_section),
+                Some(Section {
+                    section: section::Section::MemorySection(memory_section),
+                }) => program_module.memory_section = Some(memory_section),
+                Some(Section {
+                    section: section::Section::GlobalSection(global_section),
+                }) => program_module.global_section = Some(global_section),
+                Some(Section {
+                    section: section::Section::ExportSection(export_section),
+                }) => program_module.export_section = Some(export_section),
+                Some(Section {
+                    section: section::Section::ElementSection(element_section),
+                }) => program_module.element_section = Some(element_section),
+                Some(Section {
+                    section: section::Section::DataSection(data_section),
+                }) => program_module.data_section = Some(data_section),
+                Some(Section {
+                    section: section::Section::TagSection(tag_section),
+                }) => program_module.tag_section = Some(tag_section),
+                None => {}
+            }
         }
     }
 
-    Ok(ProgramModule {
-        protocol_version: Some(1),
-        version: Some(version.ok_or(anyhow!("Version not found"))?),
-        sections: proto_sections,
-    })
+    if !code_entries.is_empty() {
+        program_module.code_section = Some(CodeSection {
+            code_section_entry: code_entries,
+        });
+    }
+
+    Ok(program_module)
 }
 
 pub fn render_wasm(program: ProgramModule) -> Result<Vec<u8>> {
-    use wasm_encoder::{CodeSection, Module};
-
+    use wasm_encoder::Module;
     let mut module: Module = Module::new();
-    let mut code_section: CodeSection = CodeSection::new();
-    let mut last_code_section_entry: Option<&Section> = None;
-
-    for section in &program.sections {
-        if let Some(section::Section::CodeSectionEntry(_)) = &section.section {
-            last_code_section_entry = Some(section);
-        };
-    }
-
-    for section in &program.sections {
-        section.render_wasm(&mut module, &mut code_section)?;
-        if let Some(last_code_section_entry) = last_code_section_entry
-            && last_code_section_entry == section
-        {
-            module.section(&code_section);
-        }
-    }
+    program
+        .type_section
+        .map(|section| section.render_wasm(&mut module));
+    program
+        .import_section
+        .map(|section| section.render_wasm(&mut module));
+    program
+        .function_section
+        .map(|section| section.render_wasm(&mut module));
+    program
+        .table_section
+        .map(|section| section.render_wasm(&mut module));
+    program
+        .memory_section
+        .map(|section| section.render_wasm(&mut module));
+    program
+        .tag_section
+        .map(|section| section.render_wasm(&mut module));
+    program
+        .global_section
+        .map(|section| section.render_wasm(&mut module));
+    program
+        .export_section
+        .map(|section| section.render_wasm(&mut module));
+    program
+        .element_section
+        .map(|section| section.render_wasm(&mut module));
+    program
+        .code_section
+        .map(|section| section.render_wasm(&mut module));
+    program
+        .data_section
+        .map(|section| section.render_wasm(&mut module));
     Ok(module.finish())
 }
 
@@ -146,7 +202,9 @@ mod tests {
         assert_eq!(version.encoding, Some(wasmparser::Encoding::Module as i32));
 
         // Check sections
-        assert!(!program.sections.is_empty());
+        assert!(program.type_section.is_some());
+        assert!(program.function_section.is_some());
+        assert!(program.code_section.is_some());
     }
 
     #[test]
@@ -180,12 +238,7 @@ mod tests {
         assert!(program.version.is_some());
 
         // Should have sections including export section
-        assert!(!program.sections.is_empty());
-        let has_export_section = program
-            .sections
-            .iter()
-            .any(|s| matches!(s.section, Some(section::Section::ExportSection(_))));
-        assert!(has_export_section);
+        assert!(program.export_section.is_some());
     }
 
     #[test]
@@ -210,14 +263,12 @@ mod tests {
 
     #[test]
     fn test_render_wasm_empty_sections() {
-        let program = ProgramModule {
-            protocol_version: Some(1),
-            version: Some(Version {
-                r#number: Some(1),
-                encoding: Some(1),
-            }),
-            sections: vec![],
-        };
+        let mut program = ProgramModule::default();
+        program.protocol_version = Some(1);
+        program.version = Some(Version {
+            r#number: Some(1),
+            encoding: Some(1),
+        });
 
         let result = render_wasm(program);
 
@@ -263,12 +314,7 @@ mod tests {
         assert!(round_trip_program.is_ok());
 
         let round_trip = round_trip_program.unwrap();
-        // Check that export section is preserved
-        let has_export_section = round_trip
-            .sections
-            .iter()
-            .any(|s| matches!(s.section, Some(section::Section::ExportSection(_))));
-        assert!(has_export_section);
+        assert!(round_trip.export_section.is_some());
     }
 
     #[test]

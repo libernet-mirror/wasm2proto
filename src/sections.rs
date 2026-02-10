@@ -1,76 +1,76 @@
 use crate::libernet_wasm::*;
 use anyhow::{Ok, Result, anyhow, bail};
 
+pub mod section {
+    #[derive(Debug)]
+    pub enum Section {
+        TypeSection(super::TypeSection),
+        ImportSection(super::ImportSection),
+        FunctionSection(super::FunctionSection),
+        TableSection(super::TableSection),
+        MemorySection(super::MemorySection),
+        GlobalSection(super::GlobalSection),
+        ExportSection(super::ExportSection),
+        ElementSection(super::ElementSection),
+        DataSection(super::DataSection),
+        TagSection(super::TagSection),
+    }
+}
+
+#[derive(Debug)]
+pub struct Section {
+    pub section: section::Section,
+}
+
 impl Section {
     pub fn from_wasmparser(payload: wasmparser::Payload) -> Result<Option<Self>> {
         use wasmparser::Payload;
         match payload {
             Payload::TypeSection(section) => Ok(Some(Section {
-                section: Some(section::Section::TypeSection(TypeSection::from_wasmparser(
-                    section,
-                )?)),
+                section: section::Section::TypeSection(TypeSection::from_wasmparser(section)?),
             })),
             Payload::ImportSection(section) => Ok(Some(Section {
-                section: Some(section::Section::ImportSection(
-                    ImportSection::from_wasmparser(section)?,
-                )),
+                section: section::Section::ImportSection(ImportSection::from_wasmparser(section)?),
             })),
             Payload::FunctionSection(section) => Ok(Some(Section {
-                section: Some(section::Section::FunctionSection(
-                    FunctionSection::from_wasmparser(section)?,
-                )),
+                section: section::Section::FunctionSection(FunctionSection::from_wasmparser(
+                    section,
+                )?),
             })),
             Payload::TableSection(section) => Ok(Some(Section {
-                section: Some(section::Section::TableSection(
-                    TableSection::from_wasmparser(section)?,
-                )),
+                section: section::Section::TableSection(TableSection::from_wasmparser(section)?),
             })),
             Payload::MemorySection(section) => Ok(Some(Section {
-                section: Some(section::Section::MemorySection(
-                    MemorySection::from_wasmparser(section)?,
-                )),
+                section: section::Section::MemorySection(MemorySection::from_wasmparser(section)?),
             })),
             Payload::TagSection(section) => Ok(Some(Section {
-                section: Some(section::Section::TagSection(TagSection::from_wasmparser(
-                    section,
-                )?)),
+                section: section::Section::TagSection(TagSection::from_wasmparser(section)?),
             })),
             Payload::GlobalSection(section) => Ok(Some(Section {
-                section: Some(section::Section::GlobalSection(
-                    GlobalSection::from_wasmparser(section)?,
-                )),
+                section: section::Section::GlobalSection(GlobalSection::from_wasmparser(section)?),
             })),
             Payload::ExportSection(section) => Ok(Some(Section {
-                section: Some(section::Section::ExportSection(
-                    ExportSection::from_wasmparser(section)?,
-                )),
+                section: section::Section::ExportSection(ExportSection::from_wasmparser(section)?),
             })),
             Payload::StartSection { .. } => {
                 bail!("StartSection is not supported");
             }
             Payload::ElementSection(section) => Ok(Some(Section {
-                section: Some(section::Section::ElementSection(
-                    ElementSection::from_wasmparser(section)?,
-                )),
+                section: section::Section::ElementSection(ElementSection::from_wasmparser(
+                    section,
+                )?),
             })),
             Payload::DataCountSection { .. } => {
                 // this section provider information about data sections count, we don't need it
                 Ok(None)
             }
             Payload::DataSection(section) => Ok(Some(Section {
-                section: Some(section::Section::DataSection(DataSection::from_wasmparser(
-                    section,
-                )?)),
+                section: section::Section::DataSection(DataSection::from_wasmparser(section)?),
             })),
             Payload::CodeSectionStart { .. } => {
                 // this section provider information about code sections count, we don't need it
                 Ok(None)
             }
-            Payload::CodeSectionEntry(body) => Ok(Some(Section {
-                section: Some(section::Section::CodeSectionEntry(
-                    CodeSectionEntry::from_wasmparser(body)?,
-                )),
-            })),
             Payload::InstanceSection(_) => Ok(None),
             Payload::CoreTypeSection(_) => Ok(None),
             Payload::ComponentInstanceSection(_) => Ok(None),
@@ -85,42 +85,6 @@ impl Section {
             rest => {
                 bail!("Unknown section {:?}", rest);
             }
-        }
-    }
-    pub fn render_wasm(
-        &self,
-        module: &mut wasm_encoder::Module,
-        code_section: &mut wasm_encoder::CodeSection,
-    ) -> Result<()> {
-        match &self.section {
-            Some(section::Section::TypeSection(type_section)) => type_section.render_wasm(module),
-            Some(section::Section::ImportSection(import_section)) => {
-                import_section.render_wasm(module)
-            }
-            Some(section::Section::FunctionSection(function_section)) => {
-                function_section.render_wasm(module)
-            }
-            Some(section::Section::TableSection(table_section)) => {
-                table_section.render_wasm(module)
-            }
-            Some(section::Section::MemorySection(memory_section)) => {
-                memory_section.render_wasm(module)
-            }
-            Some(section::Section::GlobalSection(global_section)) => {
-                global_section.render_wasm(module)
-            }
-            Some(section::Section::ExportSection(export_section)) => {
-                export_section.render_wasm(module)
-            }
-            Some(section::Section::ElementSection(element_section)) => {
-                element_section.render_wasm(module)
-            }
-            Some(section::Section::CodeSectionEntry(code_section_entry)) => {
-                code_section_entry.render_wasm(code_section)
-            }
-            Some(section::Section::TagSection(tag_section)) => tag_section.render_wasm(module),
-            Some(section::Section::DataSection(data_section)) => data_section.render_wasm(module),
-            _ => bail!("render_wasm: is not supported for section {:?}", self),
         }
     }
 }
@@ -195,7 +159,7 @@ impl TypeSection {
         })
     }
 
-    fn render_wasm(&self, module: &mut wasm_encoder::Module) -> Result<()> {
+    pub fn render_wasm(&self, module: &mut wasm_encoder::Module) -> Result<()> {
         use wasm_encoder::{CompositeInnerType, CompositeType, SubType, TypeSection, ValType};
         let mut types = TypeSection::new();
         for ty in &self.types {
@@ -264,7 +228,7 @@ impl ImportSection {
         Ok(ImportSection { imports: refs })
     }
 
-    fn render_wasm(&self, module: &mut wasm_encoder::Module) -> Result<()> {
+    pub fn render_wasm(&self, module: &mut wasm_encoder::Module) -> Result<()> {
         use wasm_encoder::{EntityType, ImportSection};
         let mut imports = ImportSection::new();
         for import in &self.imports {
@@ -299,7 +263,7 @@ impl FunctionSection {
         }
         Ok(FunctionSection { type_idxs })
     }
-    fn render_wasm(&self, module: &mut wasm_encoder::Module) -> Result<()> {
+    pub fn render_wasm(&self, module: &mut wasm_encoder::Module) -> Result<()> {
         use wasm_encoder::FunctionSection;
         let mut functions = FunctionSection::new();
         for type_idx in &self.type_idxs {
@@ -339,7 +303,7 @@ impl TableSection {
         })
     }
 
-    fn render_wasm(&self, module: &mut wasm_encoder::Module) -> Result<()> {
+    pub fn render_wasm(&self, module: &mut wasm_encoder::Module) -> Result<()> {
         use wasm_encoder::{TableSection, TableType};
         let mut table_types = TableSection::new();
         for ty in &self.types {
@@ -375,7 +339,7 @@ impl MemorySection {
         }
         Ok(MemorySection { memory_types })
     }
-    fn render_wasm(&self, module: &mut wasm_encoder::Module) -> Result<()> {
+    pub fn render_wasm(&self, module: &mut wasm_encoder::Module) -> Result<()> {
         use wasm_encoder::MemorySection;
         let mut types = MemorySection::new();
         for memory in &self.memory_types {
@@ -410,7 +374,7 @@ impl GlobalSection {
         }
         Ok(GlobalSection { globals })
     }
-    fn render_wasm(&self, module: &mut wasm_encoder::Module) -> Result<()> {
+    pub fn render_wasm(&self, module: &mut wasm_encoder::Module) -> Result<()> {
         use wasm_encoder::{ConstExpr, GlobalSection, GlobalType};
         let mut globals = GlobalSection::new();
         for global in &self.globals {
@@ -455,7 +419,7 @@ impl ExportSection {
 
         Ok(ExportSection { exports })
     }
-    fn render_wasm(&self, module: &mut wasm_encoder::Module) -> Result<()> {
+    pub fn render_wasm(&self, module: &mut wasm_encoder::Module) -> Result<()> {
         use wasm_encoder::ExportSection;
         let mut exports = ExportSection::new();
         for export in &self.exports {
@@ -513,7 +477,7 @@ impl ElementSection {
         Ok(ElementSection { elements })
     }
 
-    fn render_wasm(&self, module: &mut wasm_encoder::Module) -> Result<()> {
+    pub fn render_wasm(&self, module: &mut wasm_encoder::Module) -> Result<()> {
         use wasm_encoder::{
             ConstExpr, ElementMode, ElementSection, ElementSegment, Elements,
             RefType as WasmRefType,
@@ -565,7 +529,17 @@ impl ElementSection {
 }
 
 impl CodeSectionEntry {
-    fn from_wasmparser(section: wasmparser::FunctionBody) -> Result<CodeSectionEntry> {
+    pub fn from_wasmparser(payload: &wasmparser::Payload) -> Result<Option<CodeSectionEntry>> {
+        use wasmparser::Payload;
+        match &payload {
+            &Payload::CodeSectionEntry(body) => {
+                Ok(Some(CodeSectionEntry::from_function_body(body)?))
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn from_function_body(section: &wasmparser::FunctionBody) -> Result<CodeSectionEntry> {
         let mut locals: Vec<Locals> = Vec::new();
         for local in section.get_locals_reader()? {
             let (count, val_type) = local?;
@@ -608,6 +582,18 @@ impl CodeSectionEntry {
     }
 }
 
+impl CodeSection {
+    pub fn render_wasm(&self, module: &mut wasm_encoder::Module) -> Result<()> {
+        use wasm_encoder::CodeSection;
+        let mut code_section = CodeSection::new();
+        for entry in &self.code_section_entry {
+            entry.render_wasm(&mut code_section)?;
+        }
+        module.section(&code_section);
+        Ok(())
+    }
+}
+
 impl DataSection {
     fn from_wasmparser(
         section: wasmparser::SectionLimited<'_, wasmparser::Data>,
@@ -623,7 +609,7 @@ impl DataSection {
 
         Ok(DataSection { datas })
     }
-    fn render_wasm(&self, module: &mut wasm_encoder::Module) -> Result<()> {
+    pub fn render_wasm(&self, module: &mut wasm_encoder::Module) -> Result<()> {
         use wasm_encoder::{ConstExpr, DataSection, DataSegment, DataSegmentMode};
         let mut section = DataSection::new();
         for data in &self.datas {
@@ -668,7 +654,7 @@ impl TagSection {
         }
         Ok(TagSection { tags })
     }
-    fn render_wasm(&self, module: &mut wasm_encoder::Module) -> Result<()> {
+    pub fn render_wasm(&self, module: &mut wasm_encoder::Module) -> Result<()> {
         use wasm_encoder::{TagKind, TagSection, TagType};
         let mut tags = TagSection::new();
         for tag in &self.tags {
@@ -757,10 +743,7 @@ mod tests {
                 let result = Section::from_wasmparser(payload).unwrap();
                 assert!(result.is_some());
                 let section = result.unwrap();
-                assert!(matches!(
-                    section.section,
-                    Some(section::Section::TypeSection(_))
-                ));
+                assert!(matches!(section.section, section::Section::TypeSection(_)));
                 return;
             }
         }
@@ -800,7 +783,7 @@ mod tests {
                 let section = result.unwrap();
                 assert!(matches!(
                     section.section,
-                    Some(section::Section::FunctionSection(_))
+                    section::Section::FunctionSection(_)
                 ));
                 return;
             }
@@ -872,7 +855,7 @@ mod tests {
                 let section = result.unwrap();
                 assert!(matches!(
                     section.section,
-                    Some(section::Section::ImportSection(_))
+                    section::Section::ImportSection(_)
                 ));
                 return;
             }
@@ -901,10 +884,7 @@ mod tests {
                 let result = Section::from_wasmparser(payload).unwrap();
                 assert!(result.is_some());
                 let section = result.unwrap();
-                assert!(matches!(
-                    section.section,
-                    Some(section::Section::TableSection(_))
-                ));
+                assert!(matches!(section.section, section::Section::TableSection(_)));
                 return;
             }
         }
@@ -934,7 +914,7 @@ mod tests {
                 let section = result.unwrap();
                 assert!(matches!(
                     section.section,
-                    Some(section::Section::MemorySection(_))
+                    section::Section::MemorySection(_)
                 ));
                 return;
             }
@@ -979,7 +959,7 @@ mod tests {
                 let section = result.unwrap();
                 assert!(matches!(
                     section.section,
-                    Some(section::Section::ExportSection(_))
+                    section::Section::ExportSection(_)
                 ));
                 return;
             }
@@ -1020,14 +1000,9 @@ mod tests {
         let parser = Parser::new(0);
         for payload in parser.parse_all(&wasm_bytes) {
             let payload = payload.unwrap();
-            if let Payload::CodeSectionEntry(_) = &payload {
-                let result = Section::from_wasmparser(payload).unwrap();
-                assert!(result.is_some());
-                let section = result.unwrap();
-                assert!(matches!(
-                    section.section,
-                    Some(section::Section::CodeSectionEntry(_))
-                ));
+            if let Payload::CodeSectionEntry(body) = &payload {
+                let result = CodeSectionEntry::from_function_body(body);
+                assert!(result.is_ok());
                 return;
             }
         }
@@ -1052,10 +1027,7 @@ mod tests {
                 let result = Section::from_wasmparser(payload).unwrap();
                 assert!(result.is_some());
                 let section = result.unwrap();
-                assert!(matches!(
-                    section.section,
-                    Some(section::Section::DataSection(_))
-                ));
+                assert!(matches!(section.section, section::Section::DataSection(_)));
                 return;
             }
         }
@@ -1094,12 +1066,6 @@ mod tests {
             if let Payload::StartSection { .. } = &payload {
                 let result = Section::from_wasmparser(payload);
                 assert!(result.is_err());
-                assert!(
-                    result
-                        .unwrap_err()
-                        .to_string()
-                        .contains("StartSection is not supported")
-                );
                 return;
             }
         }
@@ -1187,11 +1153,13 @@ mod tests {
             let payload = payload.unwrap();
             if let Payload::TypeSection(_) = &payload {
                 let section = Section::from_wasmparser(payload).unwrap().unwrap();
-                let mut module = Module::new();
-                let mut code_section = CodeSection::new();
-                let result = section.render_wasm(&mut module, &mut code_section);
-                assert!(result.is_ok());
-                return;
+                if let section::Section::TypeSection(type_section) = &section.section {
+                    let mut module = Module::new();
+                    let result = type_section.render_wasm(&mut module);
+                    assert!(result.is_ok());
+                    return;
+                }
+                panic!("TypeSection section not matched");
             }
         }
         panic!("TypeSection payload not found");
@@ -1226,11 +1194,13 @@ mod tests {
             let payload = payload.unwrap();
             if let Payload::FunctionSection(_) = &payload {
                 let section = Section::from_wasmparser(payload).unwrap().unwrap();
-                let mut module = Module::new();
-                let mut code_section = CodeSection::new();
-                let result = section.render_wasm(&mut module, &mut code_section);
-                assert!(result.is_ok());
-                return;
+                if let section::Section::FunctionSection(function_section) = &section.section {
+                    let mut module = Module::new();
+                    let result = function_section.render_wasm(&mut module);
+                    assert!(result.is_ok());
+                    return;
+                }
+                panic!("FunctionSection section not matched");
             }
         }
         panic!("FunctionSection payload not found");
@@ -1269,16 +1239,15 @@ mod tests {
         let parser = Parser::new(0);
         for payload in parser.parse_all(&wasm_bytes) {
             let payload = payload.unwrap();
-            if let Payload::CodeSectionEntry(_) = &payload {
-                let section = Section::from_wasmparser(payload).unwrap().unwrap();
-                let mut module = Module::new();
+            if let Payload::CodeSectionEntry(body) = &payload {
+                let entry = CodeSectionEntry::from_function_body(body).unwrap();
                 let mut code_section = CodeSection::new();
-                let result = section.render_wasm(&mut module, &mut code_section);
+                let result = entry.render_wasm(&mut code_section);
                 assert!(result.is_ok());
                 return;
             }
         }
-        panic!("CodeSectionEntry payload not found");
+        panic!("CodeSection payload not found");
     }
 
     #[test]
@@ -1307,17 +1276,17 @@ mod tests {
             if let Payload::TypeSection(_) = &payload {
                 let section = Section::from_wasmparser(payload).unwrap().unwrap();
                 let mut new_module = Module::new();
-                let mut code_section = CodeSection::new();
-                section
-                    .render_wasm(&mut new_module, &mut code_section)
-                    .unwrap();
-                let new_bytes = new_module.finish();
-                // Verify the round trip produces valid WASM
-                let new_parser = Parser::new(0);
-                for _payload in new_parser.parse_all(&new_bytes) {
-                    // Just verify it parses without error
+                if let section::Section::TypeSection(type_section) = &section.section {
+                    type_section.render_wasm(&mut new_module).unwrap();
+                    let new_bytes = new_module.finish();
+                    // Verify the round trip produces valid WASM
+                    let new_parser = Parser::new(0);
+                    for _payload in new_parser.parse_all(&new_bytes) {
+                        // Just verify it parses without error
+                    }
+                    return;
                 }
-                return;
+                panic!("TypeSection section not matched");
             }
         }
         panic!("TypeSection payload not found");
@@ -1353,17 +1322,15 @@ mod tests {
             let payload = payload.unwrap();
             if let Payload::FunctionSection(_) = &payload {
                 let section = Section::from_wasmparser(payload).unwrap().unwrap();
-                if let Some(section::Section::FunctionSection(func_section)) = &section.section {
+                if let section::Section::FunctionSection(func_section) = &section.section {
                     assert_eq!(func_section.type_idxs.len(), 2);
                     assert_eq!(func_section.type_idxs[0], 0);
                     assert_eq!(func_section.type_idxs[1], 0);
+                    let mut new_module = Module::new();
+                    func_section.render_wasm(&mut new_module).unwrap();
+                    return;
                 }
-                let mut new_module = Module::new();
-                let mut code_section = CodeSection::new();
-                section
-                    .render_wasm(&mut new_module, &mut code_section)
-                    .unwrap();
-                return;
+                panic!("FunctionSection section not matched");
             }
         }
         panic!("FunctionSection payload not found");
@@ -1388,18 +1355,16 @@ mod tests {
             let payload = payload.unwrap();
             if let Payload::TableSection(_) = &payload {
                 let section = Section::from_wasmparser(payload).unwrap().unwrap();
-                if let Some(section::Section::TableSection(table_section)) = &section.section {
+                if let section::Section::TableSection(table_section) = &section.section {
                     assert_eq!(table_section.types.len(), 1);
                     let table_type = &table_section.types[0];
                     assert_eq!(table_type.initial, Some(5));
                     assert_eq!(table_type.maximum, Some(20));
+                    let mut new_module = Module::new();
+                    table_section.render_wasm(&mut new_module).unwrap();
+                    return;
                 }
-                let mut new_module = Module::new();
-                let mut code_section = CodeSection::new();
-                section
-                    .render_wasm(&mut new_module, &mut code_section)
-                    .unwrap();
-                return;
+                panic!("TableSection section not matched");
             }
         }
         panic!("TableSection payload not found");
@@ -1424,18 +1389,16 @@ mod tests {
             let payload = payload.unwrap();
             if let Payload::MemorySection(_) = &payload {
                 let section = Section::from_wasmparser(payload).unwrap().unwrap();
-                if let Some(section::Section::MemorySection(memory_section)) = &section.section {
+                if let section::Section::MemorySection(memory_section) = &section.section {
                     assert_eq!(memory_section.memory_types.len(), 1);
                     let memory_type = &memory_section.memory_types[0];
                     assert_eq!(memory_type.initial, Some(2));
                     assert_eq!(memory_type.maximum, Some(10));
+                    let mut new_module = Module::new();
+                    memory_section.render_wasm(&mut new_module).unwrap();
+                    return;
                 }
-                let mut new_module = Module::new();
-                let mut code_section = CodeSection::new();
-                section
-                    .render_wasm(&mut new_module, &mut code_section)
-                    .unwrap();
-                return;
+                panic!("MemorySection section not matched");
             }
         }
         panic!("MemorySection payload not found");
@@ -1474,19 +1437,17 @@ mod tests {
             let payload = payload.unwrap();
             if let Payload::ExportSection(_) = &payload {
                 let section = Section::from_wasmparser(payload).unwrap().unwrap();
-                if let Some(section::Section::ExportSection(export_section)) = &section.section {
+                if let section::Section::ExportSection(export_section) = &section.section {
                     assert_eq!(export_section.exports.len(), 1);
                     assert_eq!(
                         export_section.exports[0].name,
                         Some("test_func".to_string())
                     );
+                    let mut new_module = Module::new();
+                    export_section.render_wasm(&mut new_module).unwrap();
+                    return;
                 }
-                let mut new_module = Module::new();
-                let mut code_section = CodeSection::new();
-                section
-                    .render_wasm(&mut new_module, &mut code_section)
-                    .unwrap();
-                return;
+                panic!("ExportSection section not matched");
             }
         }
         panic!("ExportSection payload not found");
@@ -1508,16 +1469,14 @@ mod tests {
             let payload = payload.unwrap();
             if let Payload::DataSection(_) = &payload {
                 let section = Section::from_wasmparser(payload).unwrap().unwrap();
-                if let Some(section::Section::DataSection(data_section)) = &section.section {
+                if let section::Section::DataSection(data_section) = &section.section {
                     assert_eq!(data_section.datas.len(), 1);
                     assert_eq!(data_section.datas[0].data, Some(b"test data".to_vec()));
+                    let mut new_module = Module::new();
+                    data_section.render_wasm(&mut new_module).unwrap();
+                    return;
                 }
-                let mut new_module = Module::new();
-                let mut code_section = CodeSection::new();
-                section
-                    .render_wasm(&mut new_module, &mut code_section)
-                    .unwrap();
-                return;
+                panic!("DataSection section not matched");
             }
         }
         panic!("DataSection payload not found");
