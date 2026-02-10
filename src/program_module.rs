@@ -142,7 +142,7 @@ mod tests {
         // Check version
         assert!(program.version.is_some());
         let version = program.version.unwrap();
-        assert_eq!(version.num, Some(1));
+        assert_eq!(version.r#number, Some(1));
         assert_eq!(version.encoding, Some(wasmparser::Encoding::Module as i32));
 
         // Check sections
@@ -213,7 +213,7 @@ mod tests {
         let program = ProgramModule {
             protocol_version: Some(1),
             version: Some(Version {
-                num: Some(1),
+                r#number: Some(1),
                 encoding: Some(1),
             }),
             sections: vec![],
@@ -281,7 +281,7 @@ mod tests {
         assert!(program.version.is_some());
 
         let version = program.version.unwrap();
-        assert_eq!(version.num, Some(1));
+        assert_eq!(version.r#number, Some(1));
         assert_eq!(version.encoding, Some(wasmparser::Encoding::Module as i32));
     }
 }

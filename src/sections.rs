@@ -139,7 +139,7 @@ impl Version {
                 }
 
                 Ok(Some(Version {
-                    num: Some(num as u32),
+                    r#number: Some(num as u32),
                     encoding: Some(encoding as i32),
                 }))
             }
@@ -721,7 +721,7 @@ mod tests {
                 let result = Version::from_wasmparser(&payload).unwrap();
                 assert!(result.is_some());
                 let version = result.unwrap();
-                assert_eq!(version.num, Some(1));
+                assert_eq!(version.r#number, Some(1));
                 assert_eq!(version.encoding, Some(wasmparser::Encoding::Module as i32));
                 return;
             }
