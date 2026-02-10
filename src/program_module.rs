@@ -1,10 +1,9 @@
 use crate::libernet_wasm::*;
-use crate::sections::*;
 
-use anyhow::{Ok, Result};
+use anyhow::{Ok, Result, bail};
 
 pub fn from_wasm(bytes: &[u8]) -> Result<ProgramModule> {
-    use wasmparser::Parser;
+    use wasmparser::{Parser, Payload};
     let mut program_module = ProgramModule {
         protocol_version: Some(1),
         ..Default::default()
@@ -12,48 +11,73 @@ pub fn from_wasm(bytes: &[u8]) -> Result<ProgramModule> {
     let mut code_entries: Vec<CodeSectionEntry> = Vec::new();
     for payload in Parser::new(0).parse_all(bytes) {
         let payload = payload?;
-        if let Some(payload) = Version::from_wasmparser(&payload)? {
-            program_module.version = Some(payload);
-        } else if let Some(code_entry) = CodeSectionEntry::from_wasmparser(&payload)? {
-            code_entries.push(code_entry);
-        } else {
-            match Section::from_wasmparser(payload)? {
-                Some(Section {
-                    section: section::Section::TypeSection(type_section),
-                }) => program_module.type_section = Some(type_section),
-                Some(Section {
-                    section: section::Section::ImportSection(import_section),
-                }) => program_module.import_section = Some(import_section),
-                Some(Section {
-                    section: section::Section::FunctionSection(function_section),
-                }) => program_module.function_section = Some(function_section),
-                Some(Section {
-                    section: section::Section::TableSection(table_section),
-                }) => program_module.table_section = Some(table_section),
-                Some(Section {
-                    section: section::Section::MemorySection(memory_section),
-                }) => program_module.memory_section = Some(memory_section),
-                Some(Section {
-                    section: section::Section::GlobalSection(global_section),
-                }) => program_module.global_section = Some(global_section),
-                Some(Section {
-                    section: section::Section::ExportSection(export_section),
-                }) => program_module.export_section = Some(export_section),
-                Some(Section {
-                    section: section::Section::ElementSection(element_section),
-                }) => program_module.element_section = Some(element_section),
-                Some(Section {
-                    section: section::Section::DataSection(data_section),
-                }) => program_module.data_section = Some(data_section),
-                Some(Section {
-                    section: section::Section::TagSection(tag_section),
-                }) => program_module.tag_section = Some(tag_section),
-                None => {}
+        match payload {
+            Payload::Version { .. } => {
+                program_module.version = Version::from_wasmparser(&payload)?;
             }
-        }
+            Payload::CodeSectionEntry { .. } => {
+                code_entries.push(CodeSectionEntry::from_wasmparser(&payload)?);
+            }
+            Payload::TypeSection(section) => {
+                program_module.type_section = Some(TypeSection::from_wasmparser(section)?);
+            }
+            Payload::ImportSection(section) => {
+                program_module.import_section = Some(ImportSection::from_wasmparser(section)?);
+            }
+            Payload::FunctionSection(section) => {
+                program_module.function_section = Some(FunctionSection::from_wasmparser(section)?);
+            }
+            Payload::TableSection(section) => {
+                program_module.table_section = Some(TableSection::from_wasmparser(section)?);
+            }
+            Payload::MemorySection(section) => {
+                program_module.memory_section = Some(MemorySection::from_wasmparser(section)?);
+            }
+            Payload::TagSection(section) => {
+                program_module.tag_section = Some(TagSection::from_wasmparser(section)?);
+            }
+            Payload::GlobalSection(section) => {
+                program_module.global_section = Some(GlobalSection::from_wasmparser(section)?);
+            }
+            Payload::ExportSection(section) => {
+                program_module.export_section = Some(ExportSection::from_wasmparser(section)?);
+            }
+            Payload::StartSection { .. } => {
+                bail!("StartSection is not supported");
+            }
+            Payload::ElementSection(section) => {
+                program_module.element_section = Some(ElementSection::from_wasmparser(section)?);
+            }
+            Payload::DataCountSection { .. } => {}
+            Payload::DataSection(section) => {
+                program_module.data_section = Some(DataSection::from_wasmparser(section)?);
+            }
+            Payload::CodeSectionStart { .. } => {
+                // this section provider information about code sections count, we don't need it
+            }
+            Payload::InstanceSection(_) => {}
+            Payload::CoreTypeSection(_) => {}
+            Payload::ComponentInstanceSection(_) => {}
+            Payload::ComponentAliasSection(_) => {}
+            Payload::ComponentTypeSection(_) => {}
+            Payload::ComponentCanonicalSection(_) => {}
+            Payload::ComponentStartSection { .. } => {}
+            Payload::ComponentImportSection(_) => {}
+            Payload::ComponentExportSection(_) => {}
+            Payload::CustomSection(_) => {}
+            Payload::End(_) => {}
+            rest => {
+                bail!("Unknown section {:?}", rest);
+            }
+        };
     }
 
-    if !code_entries.is_empty() {
+    if program_module.type_section.is_none()
+        || program_module.function_section.is_none()
+        || code_entries.is_empty()
+    {
+        bail!("Code section is required");
+    } else {
         program_module.code_section = Some(CodeSection {
             code_section_entry: code_entries,
         });
