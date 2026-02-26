@@ -14,8 +14,8 @@ impl TryFrom<wasmparser::BlockType> for BlockType {
                     valtype,
                 )?)),
             }),
-            wasmparser::BlockType::FuncType(funcidx) => Ok(BlockType {
-                block_type: Some(block_type::BlockType::FunctionType(funcidx)),
+            wasmparser::BlockType::FuncType(typeidx) => Ok(BlockType {
+                block_type: Some(block_type::BlockType::TypeIndex(typeidx)),
             }),
         }
     }
@@ -33,8 +33,8 @@ impl TryFrom<BlockType> for wasm_encoder::BlockType {
             block_type::BlockType::ValueType(valtype) => {
                 Ok(wasm_encoder::BlockType::Result(valtype.try_into()?))
             }
-            block_type::BlockType::FunctionType(funcidx) => {
-                Ok(wasm_encoder::BlockType::FunctionType(funcidx))
+            block_type::BlockType::TypeIndex(typeidx) => {
+                Ok(wasm_encoder::BlockType::FunctionType(typeidx))
             }
             _ => Err(anyhow!("Unsupported block type: {:?}", blocktype)),
         }
@@ -1775,7 +1775,7 @@ mod tests {
         let blockty = wasmparser::BlockType::FuncType(42);
         let result = BlockType::try_from(blockty).unwrap();
         match result.block_type {
-            Some(block_type::BlockType::FunctionType(idx)) => {
+            Some(block_type::BlockType::TypeIndex(idx)) => {
                 assert_eq!(idx, 42);
             }
             _ => panic!("Expected FuncType variant"),
@@ -1811,7 +1811,7 @@ mod tests {
     #[test]
     fn test_blocktype_to_wasm_encoder_func_type() {
         let blocktype = BlockType {
-            block_type: Some(block_type::BlockType::FunctionType(99)),
+            block_type: Some(block_type::BlockType::TypeIndex(99)),
         };
         let result = wasm_encoder::BlockType::try_from(blocktype).unwrap();
         match result {
